@@ -1,0 +1,48 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: I/O Core'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+
+    annotationProcessor openGds.recordBuilder
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.recordBuilder
+    compileOnly openGds.immutables.builder
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-utils')
+    implementation project(':graph-schema-api')
+    implementation project(':logging')
+    implementation project(':memory-usage')
+    implementation project(':neo4j-kernel-adapter')
+    implementation project(':neo4j-settings')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':subgraph-filtering')
+    implementation project(':transaction')
+
+    implementation openGds.jackson.databind
+    implementation openGds.jackson.dataformat.csv
+    implementation openGds.fastcsv
+    implementation(openGds.opencypher.ccparser) {
+        transitive = false
+    }
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testImplementation project(':test-utils')
+}

@@ -1,0 +1,56 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly project(':annotations')
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':executor')
+    implementation project(':model-catalog-api')
+    implementation project(':string-formatting')
+
+    api project(':proc-common')
+    api project(':alpha-proc')
+    api project(':cypher-aggregation')
+    api project(':proc-embeddings')
+    api project(':proc-similarity')
+    api project(':proc-centrality')
+    api project(':proc-community')
+    api project(':proc-path-finding')
+    api project(':proc-machine-learning')
+    api project(':proc-catalog')
+    api project(':proc-pipeline-catalog')
+    api project(':proc-misc')
+
+    // TEST DEPENDENCIES
+
+    testCompileOnly project(':annotations')
+    testCompileOnly project(':progress-tracking')
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation project(':executor')
+    testImplementation project(':legacy-cypher-projection')
+    testImplementation project(':open-model-catalog')
+    testImplementation project(':proc-test')
+
+    testImplementation project(':opengds-extension')
+}

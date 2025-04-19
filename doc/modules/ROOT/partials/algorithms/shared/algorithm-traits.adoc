@@ -1,0 +1,80 @@
+[.graph-variants, caption=]
+--
+ifdef::directed[]
+[.supported]
+<<directed>>
+endif::[]
+ifndef::directed[]
+// An unsupported Directed trait has to be added explicitly as `no-directed`
+ifdef::no-directed[]
+[.not-supported]
+<<directed-unsupported>>
+endif::[]
+ifndef::no-directed[]
+[.allowed]
+<<directed-allowed>>
+endif::[]
+endif::[]
+
+ifdef::undirected[]
+[.supported]
+<<undirected>>
+endif::[]
+ifndef::undirected[]
+[.allowed]
+<<undirected-allowed>>
+endif::[]
+
+ifdef::heterogeneous-nodes[]
+[.supported]
+<<heterogeneous-nodes>>
+endif::[]
+ifndef::heterogeneous-nodes[]
+[.allowed]
+<<heterogeneous-nodes-allowed>>
+endif::[]
+
+ifdef::heterogeneous-rels[]
+[.supported]
+<<heterogeneous-rels>>
+endif::[]
+ifndef::heterogeneous-rels[]
+[.allowed]
+<<heterogeneous-rels-allowed>>
+endif::[]
+
+ifdef::weighted[]
+[.supported]
+<<weighted>>
+endif::[]
+ifndef::weighted[]
+[.allowed]
+<<weighted-allowed>>
+endif::[]
+--
+
+[discrete.glossary]
+== Glossary
+
+[glossary]
+[[directed]]Directed:: xref:introduction.adoc#introduction-algorithms-directed[Directed trait]. The algorithm is well-defined on a directed graph.
+
+[[directed-allowed]]Directed:: xref:introduction.adoc#introduction-algorithms-directed[Directed trait]. The algorithm ignores the direction of the graph.
+
+[[directed-unsupported]]Directed:: xref:introduction.adoc#introduction-algorithms-directed[Directed trait]. The algorithm does not run on a directed graph.
+
+[[undirected]]Undirected:: xref:introduction.adoc#introduction-algorithms-undirected[Undirected trait]. The algorithm is well-defined on an undirected graph.
+
+[[undirected-allowed]]Undirected:: xref:introduction.adoc#introduction-algorithms-undirected[Undirected trait]. The algorithm ignores the undirectedness of the graph.
+
+[[heterogeneous-nodes]]Heterogeneous nodes:: xref:introduction.adoc#introduction-algorithms-heterogeneous-nodes[Heterogeneous nodes] fully supported. The algorithm has the ability to distinguish between nodes of different types.
+
+[[heterogeneous-nodes-allowed]]Heterogeneous nodes:: xref:introduction.adoc#introduction-algorithms-heterogeneous-nodes[Heterogeneous nodes] allowed. The algorithm treats all selected nodes similarly regardless of their label.
+
+[[heterogeneous-rels]]Heterogeneous relationships:: xref:introduction.adoc#introduction-algorithms-heterogeneous-rels[Heterogeneous relationships] fully supported. The algorithm has the ability to distinguish between relationships of different types.
+
+[[heterogeneous-rels-allowed]]Heterogeneous relationships:: xref:introduction.adoc#introduction-algorithms-heterogeneous-rels[Heterogeneous relationships] allowed. The algorithm treats all selected relationships similarly regardless of their type.
+
+[[weighted]]Weighted relationships:: xref:introduction.adoc#introduction-algorithms-weighted[Weighted trait]. The algorithm supports a relationship property to be used as weight, specified via the xref:common-usage/running-algos.adoc#common-configuration-relationship-weight-property[_relationshipWeightProperty_] configuration parameter.
+
+[[weighted-allowed]]Weighted relationships:: xref:introduction.adoc#introduction-algorithms-weighted[Weighted trait]. The algorithm treats each relationship as equally important, discarding the value of any relationship weight.

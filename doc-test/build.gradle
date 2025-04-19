@@ -1,0 +1,48 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Docs'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    implementation     project(':algo-common')
+    implementation     project(':annotations')
+    implementation     project(':config-api')
+    implementation     project(':core')
+    implementation     project(':doc-test-tools')
+    implementation     project(':executor')
+    implementation     project(':graph-schema-api')
+    implementation     project(':model-catalog-api')
+    implementation     project(':open-model-catalog')
+    implementation     project(':proc-pregel')
+    implementation     project(':string-formatting')
+    implementation     project(':test-utils')
+
+    implementation     openGds.asciidoctorj
+    implementation     openGds.reflections
+
+    testImplementation project(':cypher-aggregation')
+    testImplementation project(':proc')
+    testImplementation project(':pregel-example')
+    testImplementation project(':progress-tracking')
+    testImplementation project(':pipeline')
+    testImplementation project(':proc-sysinfo')
+    testImplementation project(':ml-algo')
+
+    testImplementation openGds.reflections
+
+    testImplementation project(':opengds-extension')
+}
+
+tasks.register('unpackDocs', Copy) {
+    dependsOn project(':doc').tasks.assembleDocs
+    from tarTree(project(':doc').tasks.assembleDocs.archiveFile)
+    into "${layout.buildDirectory.get()}/doc-sources"
+}
+
+processTestResources.dependsOn tasks.named('unpackDocs')

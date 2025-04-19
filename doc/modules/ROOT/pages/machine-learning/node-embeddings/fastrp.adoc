@@ -1,0 +1,671 @@
+[[fastrp]]
+= Fast Random Projection
+:description: This section describes the Fast Random Projection (FastRP) node embedding algorithm in the Neo4j Graph Data Science library.
+:entity: node
+:result: embedding
+:algorithm: FastRP
+
+:directed:
+:undirected:
+:weighted:
+include::partial$/algorithms/shared/algorithm-traits.adoc[]
+
+{nbsp} +
+[TIP]
+====
+FastRP is featured in the end-to-end example Jupyter notebooks:
+
+* https://neo4j.com/docs/graph-data-science-client/current/tutorials/fastrp-and-knn/[Product recommendations with kNN based on FastRP embeddings]
+====
+
+
+[[algorithms-embeddings-fastrp-introduction]]
+== Introduction
+
+Fast Random Projection, or FastRP for short, is a node embedding algorithm in the family of random projection algorithms.
+These algorithms are theoretically backed by the Johnsson-Lindenstrauss lemma according to which one can project _n_ vectors of _arbitrary_ dimension into _O(log(n))_ dimensions and still approximately preserve pairwise distances among the points.
+In fact, a linear projection chosen in a random way satisfies this property.
+
+Such techniques therefore allow for aggressive dimensionality reduction while preserving most of the distance information.
+The FastRP algorithm operates on graphs, in which case we care about preserving similarity between nodes and their neighbors.
+This means that two nodes that have similar neighborhoods should be assigned similar embedding vectors.
+Conversely, two nodes that are not similar should be not be assigned similar embedding vectors.
+
+The GDS implementation of FastRP extends the original algorithmfootnote:[Chen, Haochen, Syed Fahad Sultan, Yingtao Tian, Muhao Chen, and Steven Skiena. "Fast and Accurate Network Embeddings via Very Sparse Random Projection." _arXiv preprint arXiv:1908.11512_ (2019).] in several ways:
+
+- It allows the usage of <<_node_properties,node properties>> to influence the creation of the initial random vectors.
+- It introduces the <<algorithms-embeddings-fastrp-node-self-influence,`nodeSelfInfluence`>> parameter.
+- It supports <<algorithms-embeddings-fastrp-node-self-orientation,directed graphs>>.
+- It supports <<algorithms-embeddings-fastrp-weighted,weighted graphs>>.
+
+The FastRP algorithm initially assigns random vectors to all nodes using a technique called _very sparse random projection_ footnote:[Achlioptas, Dimitris. "Database-friendly random projections: Johnson-Lindenstrauss with binary coins." _Journal of computer and System Sciences_ 66, no. 4 (2003): 671-687.]. Starting with random vectors (_node projections_) and iteratively averaging over node neighborhoods, the algorithm constructs a sequence of _intermediate embeddings_ image:equations/fastrp/fastrp1.svg[e n to the ith] for each node _n_.
+More precisely,
+
+image::equations/fastrp/fastrp2.svg[e n to the ith equals average of e m to the ith minus one,align="center"]
+
+where _m_ ranges over neighbors of _n_ and image:equations/fastrp/fastrp3.svg[e n to the zeroeth] is the node's initial random vector.
+
+The embedding image:equations/fastrp/fastrp4.svg[e n] of node _n_, which is the output of the algorithm, is a combination of the vectors and embeddings defined above:
+
+image::equations/fastrp/fastrp5.svg[e n equals w zero times normalise r n plus sum from i equals 1 to k of w i times normalise e n to the ith,align="center"]
+
+where `normalize` is the function which divides a vector with its https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm[L2 norm], the value of `nodeSelfInfluence` is image:equations/fastrp/fastrp6.svg[w zero], and the values of `iterationWeights` are image:equations/fastrp/fastrp7.svg[w 1 comma w 2 comma dot dot dot w k].
+We will return to xref:machine-learning/node-embeddings/fastrp.adoc#algorithms-embeddings-fastrp-node-self-influence[Node Self Influence] later on.
+
+Therefore, each node's embedding depends on a neighborhood of radius equal to the number of iterations.
+This way FastRP exploits higher-order relationships in the graph while still being highly scalable.
+
+
+=== Node properties
+
+Most real-world graphs contain node properties which store information about the nodes and what they represent.
+The FastRP algorithm in the GDS library extends the original FastRP algorithm with a capability to take node properties into account.
+The resulting embeddings can therefore represent the graph more accurately.
+
+The node property aware aspect of the algorithm is configured via the parameters `featureProperties` and `propertyRatio`.
+Each node property in `featureProperties` is associated with a randomly generated vector of dimension `propertyDimension`, where `propertyDimension = embeddingDimension * propertyRatio`.
+Each node is then initialized with a vector of size `embeddingDimension` formed by concatenation of two parts:
+
+. The first part is formed like in the standard FastRP algorithm,
+. The second one is a linear combination of the property vectors, using the property values of the node as weights.
+
+The algorithm then proceeds with the same logic as the FastRP algorithm.
+Therefore, the algorithm will output arrays of size `embeddingDimension`.
+The last `propertyDimension` coordinates in the embedding captures information about property values of nearby nodes (the "property part" below), and the remaining coordinates (`embeddingDimension` - `propertyDimension` of them; "topology part") captures information about nearby presence of nodes.
+
+----
+[0, 1, ...        | ...,   N - 1, N]
+ ^^^^^^^^^^^^^^^^ | ^^^^^^^^^^^^^^^
+  topology part   |  property part
+                  ^
+           property ratio
+----
+
+
+=== Usage in machine learning pipelines
+
+It may be useful to generate node embeddings with FastRP as a node property step in a machine learning pipeline (like xref:machine-learning/linkprediction-pipelines/link-prediction.adoc[] and xref:machine-learning/node-property-prediction/index.adoc[]).
+
+In order for a machine learning model to be able to make useful predictions, it is important that features produced during prediction are of a similar distribution to the features produced during training of the model.
+Moreover, node property steps (whether FastRP or not) added to a pipeline are executed both during training, and during the prediction by the trained model.
+It is therefore problematic when a pipeline contains an embedding step which yields all too dissimilar embeddings during training and prediction.
+
+This has some implications on how to use FastRP as a node property step.
+In general, if a pipeline is trained using FastRP as a node property step on some graph "g", then the resulting trained model should only be applied to graphs that are not too dissimilar to "g".
+
+If `propertyRatio<1.0`, most of the nodes in the graph that a prediction is being run on, must be the same nodes (in the database sense) as in the original graph "g" that was used during training.
+The reason for this is that FastRP is a random algorithm, and in this case is seeded based on the nodes' ids in the Neo4j database from whence the nodes came.
+
+If `propertyRatio=1.0` however, the random initial node embeddings are derived from node property vectors only, so there is no random seeding based on node ids.
+
+Additionally, in order for the initial random vectors (independent of `propertyRatio` used) to be consistent between runs (training and prediction calls), a value for the `randomSeed` configuration parameter must be provided when adding the FastRP node property step to the training pipeline.
+
+In summary, if you set a random seed and set `propertyRatio` to 1, FastRP is xref:machine-learning/node-embeddings/index.adoc#node-embeddings-generalization[inductive] because embeddings are based only on node properties projected deterministically into vectors.
+
+
+[[algorithms-embeddings-fastrp-parameter-tuning]]
+== Tuning algorithm parameters
+
+In order to improve the embedding quality using FastRP on one of your graphs, it is possible to tune the algorithm parameters.
+This process of finding the best parameters for your specific use case and graph is typically referred to as https://en.wikipedia.org/wiki/Hyperparameter_optimization[hyperparameter tuning].
+We will go through each of the configuration parameters and explain how they behave.
+
+For statistically sound results, it is a good idea to reserve a test set excluded from parameter tuning.
+After selecting a set of parameter values, the embedding quality can be evaluated using a downstream machine learning task on the test set.
+By varying the parameter values and studying the precision of the machine learning task, it is possible to deduce the parameter values that best fit the concrete dataset and use case.
+To construct such a set you may want to use a dedicated node label in the graph to denote a subgraph without the test data.
+
+
+=== Embedding dimension
+
+The embedding dimension is the length of the produced vectors.
+A greater dimension offers a greater precision, but is more costly to operate over.
+
+The optimal embedding dimension depends on the number of nodes in the graph.
+Since the amount of information the embedding can encode is limited by its dimension, a larger graph will tend to require a greater embedding dimension.
+A typical value is a power of two in the range 128 - 1024.
+A value of at least 256 gives good results on graphs in the order of 10^5^ nodes, but in general increasing the dimension improves results.
+Increasing embedding dimension will however increase memory requirements and runtime linearly.
+
+
+=== Normalization strength
+
+The normalization strength is used to control how node degrees influence the embedding.
+Using a negative value will downplay the importance of high degree neighbors, while a positive value will instead increase their importance.
+The optimal normalization strength depends on the graph and on the task that the embeddings will be used for.
+In the original paper, hyperparameter tuning was done in the range of `[-1,0]` (no positive values), but we have found cases where a positive normalization strengths gives better results.
+
+
+=== Iteration weights
+
+The iteration weights parameter control two aspects: the number of iterations, and their relative impact on the final node embedding.
+The parameter is a list of numbers, indicating one iteration per number where the number is the weight applied to that iteration.
+
+In each iteration, the algorithm will expand across all relationships in the graph.
+This has some implications:
+
+* With a single iteration, only direct neighbors will be considered for each node embedding.
+* With two iterations, direct neighbors and second-degree neighbors will be considered for each node embedding.
+* With three iterations, direct neighbors, second-degree neighbors, and third-degree neighbors will be considered for each node embedding.
+Direct neighbors may be reached twice, in different iterations.
+* In general, the embedding corresponding to the `i`:th iteration contains features depending on nodes reachable with paths of length `i`.
+If the graph is undirected, then a node reachable with a path of length `L` can also be reached with length `L+2k`, for any integer `k`.
+* In particular, a node may reach back to itself on each even iteration (depending on the direction in the graph).
+
+It is good to have at least one non-zero weight in an even and in an odd position.
+Typically, using at least a few iterations, for example three, is recommended.
+However, a too high value will consider nodes far away and may not be informative or even be detrimental.
+The intuition here is that as the projections reach further away from the node, the less specific the neighborhood becomes.
+Of course, a greater number of iterations will also take more time to complete.
+
+
+[[algorithms-embeddings-fastrp-node-self-influence]]
+=== Node Self Influence
+
+Node Self Influence is a variation of the original FastRP algorithm.
+
+How much a node's embedding is affected by the intermediate embedding at iteration _i_ is controlled by the _i_'th element of `iterationWeights`.
+This can also be seen as how much the initial random vectors, or projections, of nodes that can be reached in _i_ hops from a node affect the embedding of the node.
+Similarly, `nodeSelfInfluence` behaves like an iteration weight for a _0_ th iteration, or the amount of influence the projection of a node has on the embedding of the same node.
+
+A reason for setting this parameter to a non-zero value is if your graph has low connectivity or a significant amount of isolated nodes.
+Isolated nodes combined with using `propertyRatio = 0.0` leads to embeddings that contain all zeros.
+However using node properties along with node self influence can thus produce more meaningful embeddings for such nodes.
+This can be seen as producing fallback features when graph structure is (locally) missing.
+Moreover, sometimes a node's own properties are simply informative features and are good to include even if connectivity is high.
+Finally, node self influence can be used for pure dimensionality reduction to compress node properties used for node classification.
+
+If node properties are not used, using `nodeSelfInfluence` may also have a positive effect, depending on other settings and on the problem.
+
+
+[[algorithms-embeddings-fastrp-node-self-orientation]]
+=== Orientation
+
+Choosing the right orientation when creating the graph may have the single greatest impact.
+The FastRP algorithm is designed to work with undirected graphs, and we expect this to be the best in most cases.
+If you expect only outgoing or incoming relationships to be informative for a prediction task, then you may want to try using the orientations `NATURAL` or `REVERSE` respectively.
+
+
+[[algorithms-embeddings-fastrp-weighted]]
+=== Weighted graphs
+
+By default, the algorithm treats the graph relationships as unweighted.
+You can specify a relationship weight with the `relationshipWeightProperty` parameter to instruct the algorithm to compute weighted averages of the neighboring embeddings.
+
+
+[[algorithms-embeddings-fastrp-syntax]]
+== Syntax
+
+include::partial$/algorithms/shared/syntax-intro-named-graph.adoc[]
+
+.FastRP syntax per mode
+[.tabbed-example, caption = ]
+====
+
+[.include-with-stream]
+======
+
+.Run FastRP in stream mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stream(
+  graphName: String,
+  configuration: Map
+) YIELD
+  nodeId: Integer,
+  embedding: List of Float
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-stream-stats-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/fastrp/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header"]
+|===
+| Name      | Type         | Description
+| nodeId    | Integer      | Node ID.
+| embedding | List of Float  | FastRP node embedding.
+|===
+======
+
+[.include-with-stats]
+======
+
+.Run FastRP in stats mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stats(
+  graphName: String,
+  configuration: Map
+) YIELD
+  nodeCount: Integer,
+  preProcessingMillis: Integer,
+  computeMillis: Integer,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-stream-stats-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/fastrp/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header",cols="1,1,6"]
+|===
+| Name                | Type    | Description
+| nodeCount           | Integer | Number of nodes processed.
+| preProcessingMillis | Integer | Milliseconds for preprocessing the graph.
+| computeMillis       | Integer | Milliseconds for running the algorithm.
+| configuration       | Map     | Configuration used for running the algorithm.
+|===
+
+======
+
+[.include-with-mutate]
+======
+
+.Run FastRP in mutate mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.mutate(
+  graphName: String,
+  configuration: Map
+) YIELD
+  nodeCount: Integer,
+  nodePropertiesWritten: Integer,
+  preProcessingMillis: Integer,
+  computeMillis: Integer,
+  mutateMillis: Integer,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-mutate-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/fastrp/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header"]
+|===
+| Name                  | Type    | Description
+| nodeCount             | Integer | Number of nodes processed.
+| nodePropertiesWritten | Integer | Number of node properties written.
+| preProcessingMillis   | Integer | Milliseconds for preprocessing the graph.
+| computeMillis         | Integer | Milliseconds for running the algorithm.
+| mutateMillis          | Integer | Milliseconds for adding properties to the in-memory graph.
+| configuration         | Map     | Configuration used for running the algorithm.
+|===
+======
+
+[.include-with-write]
+======
+
+.Run FastRP in write mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.write(
+  graphName: String,
+  configuration: Map
+) YIELD
+  nodeCount: Integer,
+  nodePropertiesWritten: Integer,
+  preProcessingMillis: Integer,
+  computeMillis: Integer,
+  writeMillis: Integer,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-write-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/fastrp/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header"]
+|===
+| Name                  | Type    | Description
+| nodeCount             | Integer | Number of nodes processed.
+| nodePropertiesWritten | Integer | Number of node properties written.
+| preProcessingMillis   | Integer | Milliseconds for preprocessing the graph.
+| computeMillis         | Integer | Milliseconds for running the algorithm.
+| writeMillis           | Integer | Milliseconds for writing result data back to Neo4j.
+| configuration         | Map     | Configuration used for running the algorithm.
+|===
+
+======
+
+====
+
+
+[[algorithms-embeddings-fastrp-examples]]
+== Examples
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+:algorithm-name: FastRP node embedding
+:graph-description: social network
+:image-file: fastrp.svg
+include::partial$/algorithms/shared/examples-intro.adoc[]
+
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  (dan:Person {name: 'Dan', age: 18}),
+  (annie:Person {name: 'Annie', age: 12}),
+  (matt:Person {name: 'Matt', age: 22}),
+  (jeff:Person {name: 'Jeff', age: 51}),
+  (brie:Person {name: 'Brie', age: 45}),
+  (elsa:Person {name: 'Elsa', age: 65}),
+  (john:Person {name: 'John', age: 64}),
+
+  (dan)-[:KNOWS {weight: 1.0}]->(annie),
+  (dan)-[:KNOWS {weight: 1.0}]->(matt),
+  (annie)-[:KNOWS {weight: 1.0}]->(matt),
+  (annie)-[:KNOWS {weight: 1.0}]->(jeff),
+  (annie)-[:KNOWS {weight: 1.0}]->(brie),
+  (matt)-[:KNOWS {weight: 3.5}]->(brie),
+  (brie)-[:KNOWS {weight: 1.0}]->(elsa),
+  (brie)-[:KNOWS {weight: 2.0}]->(jeff),
+  (john)-[:KNOWS {weight: 1.0}]->(jeff);
+----
+
+This graph represents seven people who know one another.
+A relationship property `weight` denotes the strength of the knowledge between two persons.
+
+With the graph in Neo4j we can now project it into the graph catalog to prepare it for algorithm execution.
+We do this using a Cypher projection targeting the `Person` nodes and the `KNOWS` relationships.
+For the relationships we will use the `UNDIRECTED` orientation.
+This is because the FastRP algorithm has been measured to compute more predictive node embeddings in undirected graphs.
+We will also add the `weight` relationship property which we will make use of when running the weighted version of FastRP.
+
+.The following statement will project a graph using a Cypher projection and store it in the graph catalog under the name 'persons'.
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (source:Person)-[r:KNOWS]->(target:Person)
+RETURN gds.graph.project(
+  'persons',
+  source,
+  target,
+  {
+    sourceNodeProperties: source { .age },
+    targetNodeProperties: target { .age },
+    relationshipProperties: r { .weight }
+  },
+  { undirectedRelationshipTypes: ['*'] }
+)
+----
+
+
+[[algorithms-embeddings-fastrp-examples-memory-estimation]]
+=== Memory Estimation
+
+:mode: stream
+include::partial$/algorithms/shared/examples-estimate-intro.adoc[]
+
+[role=query-example]
+--
+.The following will estimate the memory requirements for running the algorithm:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stream.estimate('persons', {embeddingDimension: 128})
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+----
+
+.Results
+[opts="header", cols="1,1,1,1,1"]
+|===
+| nodeCount | relationshipCount | bytesMin | bytesMax | requiredMemory
+| 7         | 18                | 11392    | 11392    | "11392 Bytes"
+|===
+--
+
+
+[[algorithms-embeddings-fastrp-examples-stream]]
+=== Stream
+
+:stream-details: For example, we can collect the results and pass them into a similarity algorithm.
+include::partial$/algorithms/shared/examples-stream-intro.adoc[]
+
+[role=query-example]
+--
+.The following will run the algorithm, and stream results:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stream('persons',
+  {
+    embeddingDimension: 4,
+    randomSeed: 42
+  }
+)
+YIELD nodeId, embedding
+RETURN gds.util.asNode(nodeId).name as person, embedding
+ORDER BY person
+----
+
+[opts=header]
+.Results
+|===
+| person    | embedding
+| "Annie"   | [0.51714468, -0.4148067832, -0.5454565287, -1.741045475]
+| "Brie"    | [0.4184039235, -0.4415202737, 0.2315290272, -1.5677155256]
+| "Dan"     | [0.2612129152, -0.6138446331, -0.369674772, -1.7762401104]
+| "Elsa"    | [0.5556756258, -0.3558300138, 0.308482945, -1.5653611422]
+| "Jeff"    | [0.6856793165, -0.3247893453, -0.3811529875, -1.5765502453]
+| "John"    | [1.0, -0.0890870914, -0.4454354346, -0.8908708692]
+| "Matt"    | [0.2737978995, -0.4965225756, -0.3031099439, -1.8122189045]
+|===
+--
+
+The results of the algorithm are not very intuitively interpretable, as the node embedding format is a mathematical abstraction of the node within its neighborhood, designed for machine learning programs.
+What we can see is that the embeddings have four elements (as configured using `embeddingDimension`) and that the numbers are relatively small (they all fit in the range of `[-2, 2]`).
+The magnitude of the numbers is controlled by the `embeddingDimension`, the number of nodes in the graph, and by the fact that FastRP performs euclidean normalization on the intermediate embedding vectors.
+
+[NOTE]
+====
+Due to the random nature of the algorithm the results will vary between the runs.
+However, this does not necessarily mean that the pairwise distances of two node embeddings vary as much.
+====
+
+
+[[algorithms-embeddings-fastrp-examples-stats]]
+=== Stats
+
+:stats-syntax: algorithms-embeddings-fastrp-syntax
+include::partial$/algorithms/shared/examples-stats-intro.adoc[]
+
+[role=query-example]
+--
+.The following will run the algorithm and returns the result in form of statistical and measurement values
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stats('persons', { embeddingDimension: 8 })
+YIELD nodeCount
+----
+
+[opts=header]
+.Results
+|===
+| nodeCount
+| 7
+|===
+--
+
+The `stats` mode does not currently offer any statistical results for the embeddings themselves.
+We can however see that the algorithm has successfully processed all seven nodes in our example graph.
+
+
+[[algorithms-embeddings-fastrp-examples-mutate]]
+=== Mutate
+
+include::partial$/algorithms/shared/examples-mutate-intro.adoc[]
+
+[role=query-example]
+--
+.The following will run the algorithm in `mutate` mode:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.mutate(
+  'persons',
+  {
+    embeddingDimension: 8,
+    mutateProperty: 'fastrp-embedding'
+  }
+)
+YIELD nodePropertiesWritten
+----
+
+[opts=header]
+.Results
+|===
+| nodePropertiesWritten
+| 7
+|===
+--
+
+The returned result is similar to the `stats` example.
+Additionally, the graph 'persons' now has a node property `fastrp-embedding` which stores the node embedding for each node.
+To find out how to inspect the new schema of the in-memory graph, see xref:management-ops/graph-list.adoc[Listing graphs].
+
+
+[[algorithms-embeddings-fastrp-examples-write]]
+=== Write
+
+include::partial$/algorithms/shared/examples-write-intro.adoc[]
+
+[role=query-example]
+--
+.The following will run the algorithm in `write` mode:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.write(
+  'persons',
+  {
+    embeddingDimension: 8,
+    writeProperty: 'fastrp-embedding'
+  }
+)
+YIELD nodePropertiesWritten
+----
+
+[opts=header]
+.Results
+|===
+| nodePropertiesWritten
+| 7
+|===
+--
+
+The returned result is similar to the `stats` example.
+Additionally, each of the seven nodes now has a new property `fastrp-embedding` in the Neo4j database, containing the node embedding for that node.
+
+
+[[algorithms-embeddings-fastrp-examples-weighted]]
+=== Weighted
+
+Below is an example of running the weighted variant of algorithm.
+
+[role=query-example]
+--
+.The following will run the algorithm, and stream results:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stream(
+  'persons',
+  {
+    embeddingDimension: 4,
+    randomSeed: 42,
+    relationshipWeightProperty: 'weight'
+  }
+)
+YIELD nodeId, embedding
+RETURN gds.util.asNode(nodeId).name as person, embedding
+ORDER BY person
+----
+
+[opts=header]
+.Results
+|===
+| person      | embedding
+| "Annie"     | [0.034561187, -0.2929389477, 0.0952546224, -1.9652962685]
+| "Brie"      | [0.1023679227, -0.2991863489, 0.5466092229, -1.2881529331]
+| "Dan"       | [-0.0909044892, -0.4465829134, 0.3275954127, -1.6877939701]
+| "Elsa"      | [0.0776494294, -0.2621908784, 0.5610812902, -1.2880744934]
+| "Jeff"      | [0.1686269641, -0.2775687575, 0.4166130424, -1.3728146553]
+| "John"      | [0.5247224569, -0.045596078, 0.3423381448, -0.9119215012]
+| "Matt"      | [0.0523263216, -0.3151839674, 0.4781413078, -1.4239065647]
+|===
+--
+
+Since the initial state of the algorithm is randomised, it isn't possible to intuitively analyse the effect of the relationship weights.
+
+
+[[algorithms-embeddings-fastrp-examples-properties]]
+=== Using node properties as features
+
+To explain the novel initialization using node properties, let us consider an example where `embeddingDimension` is 10, `propertyRatio` is 0.2.
+The dimension of the embedded properties, `propertyDimension` is thus 2.
+Assume we have a property `f1` of scalar type, and a property `f2` storing arrays of length 2.
+This means that there are 3 features which we order like `f1` followed by the two values of `f2`.
+For each of these three features we sample a two dimensional random vector.
+Let's say these are `p1=[0.0, 2.4]`, `p2=[-2.4, 0.0]` and `p3=[2.4, 0.0]`.
+Consider now a node `(n {f1: 0.5, f2: [1.0, -1.0]})`.
+The linear combination mentioned above, is in concrete terms `0.5 * p1 + 1.0 * p2 - 1.0 * p3 = [-4.8, 1.2]`.
+The initial random vector for the node `n` contains first 8 values sampled as in the original FastRP paper, and then our computed values `-4.8` and `1.2`, totalling 10 entries.
+
+In the example below, we again set the embedding dimension to 2, but we set `propertyRatio` to 1, which means the embedding is computed from node properties only.
+
+[role=query-example]
+--
+.The following will run FastRP with feature properties:
+[source, cypher, role=noplay]
+----
+CALL gds.fastRP.stream('persons', {
+    randomSeed: 42,
+    embeddingDimension: 2,
+    propertyRatio: 1.0,
+    featureProperties: ['age'],
+    iterationWeights: [1.0]
+}) YIELD nodeId, embedding
+RETURN gds.util.asNode(nodeId).name AS person, embedding
+ORDER BY person
+----
+
+.Results
+[opts="header", cols="1,1"]
+|===
+| person | embedding
+| "Annie" | [0.0, -1.0]
+| "Brie" | [0.0, -0.9999999403953552]
+| "Dan" | [0.0, -1.0]
+| "Elsa" | [0.0, -1.0]
+| "Jeff" | [0.0, -1.0]
+| "John" | [0.0, -1.0]
+| "Matt" | [0.0, -0.9999999403953552]
+|===
+--
+
+In this example, the embeddings are based on the `age` property.
+Because of L2 normalization which is applied to each iteration (here only one iteration), all nodes have the same embedding despite having different age values (apart from rounding errors).

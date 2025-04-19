@@ -1,0 +1,28 @@
+[[neo4j-server]]
+= Neo4j Server
+
+On a standalone Neo4j Server you need to install and configure GDS manually.
+
+. Open the link:https://neo4j.com/deployment-center/#gds-tab[Neo4j Deployment Center] and head to the Graph Data Science Self-Managed section.
+
+. Check that the version of the Neo4j Graph Data Science Library is xref:installation/supported-neo4j-versions.adoc[compatible] with your Neo4j Server and download the compressed file.
+
+. Decompress the file and move the `neo4j-graph-data-science-[version].jar` file into the `$NEO4J_HOME/plugins` directory.
+
+. Add the following to your `$NEO4J_HOME/conf/neo4j.conf` file:
++
+----
+dbms.security.procedures.unrestricted=gds.*
+----
+This configuration entry is necessary because the GDS library accesses low-level components of Neo4j to maximise performance.
++
+
+. Check if the procedure allowlist is enabled in the `$NEO4J_HOME/conf/neo4j.conf` file, namely if the `dbms.security.procedures.allowlist` option is _not_ commented out with a leading `#` sign. In this case, add the GDS library to the allowlist:
++
+----
+dbms.security.procedures.allowlist=gds.*
+----
+You can find more information on allow listing in the link:https://neo4j.com/docs/operations-manual/current/security/securing-extensions/#allow-listing[Operations Manual].
++
+
+. Restart the Neo4j Server.

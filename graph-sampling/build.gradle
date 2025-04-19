@@ -1,0 +1,40 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Graph Sampling'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':graph-schema-api')
+    implementation project(':progress-tracking')
+    implementation project(':subgraph-filtering')
+    implementation project(':memory-usage')
+    implementation project(':string-formatting')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+
+    testImplementation project(':core-test-utils')
+    testImplementation project(':logging')
+    testImplementation project(':test-utils')
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+}

@@ -1,0 +1,45 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Examples :: Pregel'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor project(':pregel-proc-generator')
+
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':algo-common')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':executor')
+    implementation project(':memory-usage')
+    implementation project(':pregel')
+    implementation project(':proc-common')
+    implementation project(':proc-pregel')
+    implementation project(':progress-tracking')
+    implementation project(':termination')
+    implementation project(':transaction')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+
+    testImplementation project(':proc-test')
+    testImplementation project(':proc-common')
+    testImplementation project(':graph-schema-api')
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.google.auto.service
+
+    testImplementation project(':opengds-extension')
+}

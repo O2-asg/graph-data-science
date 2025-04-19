@@ -1,0 +1,36 @@
+[[appendix-a-additional-ops]]
+= Additional Operations
+
+.List of all additional operations.
+[role=procedure-listing]
+[opts=header,cols="1, 1"]
+|===
+| Description                                                     | Operation
+.2+<.^| xref:management-ops/utility-functions.adoc[The version of the installed GDS]
+| `gds.version` label:procedure[Procedure]
+| `gds.version` label:function[Function]
+| xref:installation/index.adoc#_verifying_the_installation[List all operations in GDS]        | `gds.list` label:procedure[Procedure]
+| xref:common-usage/logging.adoc#logging-progress-logging[List logged progress]              | `gds.listProgress` label:procedure[Procedure]
+| xref:common-usage/logging.adoc#logging-user-warnings[List warnings]              |       `gds.userLog` label:procedure[Procedure]
+.2+<.^| xref:installation/index.adoc#_verifying_the_installation[The license state of the installed GDS]         | `gds.license.state` label:procedure[Procedure]
+        | `gds.isLicensed` label:function[Function]
+.2+<.^| xref:management-ops/utility-functions.adoc#utility-functions-node-path[Node id functions]
+| `gds.util.asNode` label:function[Function]
+| `gds.util.asNodes` label:function[Function]
+.4+<.^| xref:management-ops/utility-functions.adoc#utility-functions-numeric[Numeric Functions]
+| `gds.util.NaN` label:function[Function]
+| `gds.util.infinity` label:function[Function]
+| `gds.util.isFinite` label:function[Function]
+| `gds.util.isInfinite` label:function[Function]
+| xref:management-ops/graph-reads/graph-stream-nodes.adoc#utility-functions-catalog[Accessing a node property in a named graph] | `gds.util.nodeProperty` label:function[Function]
+| xref:machine-learning/pre-processing/one-hot-encoding.adoc[One Hot Encoding] | `gds.alpha.ml.oneHotEncoding` label:function[Function]
+| xref:common-usage/debug-sysinfo.adoc[Status of the system]                                   | `gds.debug.sysInfo` label:procedure[Procedure]
+| xref:installation/configure-apache-arrow-server.adoc[Monitoring]                              | `gds.debug.arrow` label:procedure[Procedure]
+| xref:common-usage/monitoring-system.adoc[Get an overview of the system's workload and available resources] | `gds.systemMonitor` label:procedure[Procedure]
+| xref:management-ops/backup-restore.adoc[Back-up graphs and models to disk]             | `gds.backup` label:procedure[Procedure]
+| xref:management-ops/backup-restore.adoc[Restore persisted graphs and models to memory] | `gds.restore` label:procedure[Procedure]
+| xref:production-deployment/defaults-and-limits.adoc[List configured defaults] | `gds.config.defaults.list` label:procedure[Procedure]
+| xref:production-deployment/defaults-and-limits.adoc[Configure a default] | `gds.config.defaults.set` label:procedure[Procedure]
+| xref:production-deployment/defaults-and-limits.adoc#_limits_on_configuration_values[List configured limits] | `gds.config.limits.list` label:procedure[Procedure]
+| xref:production-deployment/defaults-and-limits.adoc#_limits_on_configuration_values[Configure a limit] | `gds.config.limits.set` label:procedure[Procedure]
+|===

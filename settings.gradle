@@ -1,0 +1,332 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            name = 'GDS local-hosted plugins'
+            url 'dependencies/plugins/repository'
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        openGds {
+            from(files("gradle/libs.versions.toml"))
+        }
+    }
+}
+
+
+rootProject.name = 'open-gds'
+
+include('algo')
+project(':algo').projectDir = file('algo')
+
+include('algo-common')
+project(':algo-common').projectDir = file('algo-common')
+
+include('algo-test')
+project(':algo-test').projectDir = file('algo-test')
+
+
+include('alpha-proc')
+project(':alpha-proc').projectDir = file('alpha/alpha-proc')
+
+include('annotations')
+project(':annotations').projectDir = file('annotations')
+
+include('collections')
+project(':collections').projectDir = file('collections')
+
+include('collections-generator')
+project(':collections-generator').projectDir = file('collections-generator')
+
+include('collections-memory-estimation')
+project(':collections-memory-estimation').projectDir = file('collections-memory-estimation')
+
+include('concurrency')
+project(':concurrency').projectDir = file('concurrency')
+
+include('concurrency-validation-api')
+project(':concurrency-validation-api').projectDir = file('concurrency-validation-api')
+
+include('config-api')
+project(':config-api').projectDir = file('config-api')
+
+include('config-generator')
+project(':config-generator').projectDir = file('config-generator')
+
+include('core')
+project(':core').projectDir = file('core')
+
+include('core-write')
+project(':core-write').projectDir = file('core-write')
+
+include('core-utils')
+project(':core-utils').projectDir = file('core-utils')
+
+include('core-test-utils')
+project(':core-test-utils').projectDir = file('core-test-utils')
+
+include('csv')
+project(':csv').projectDir = file('io/csv')
+
+include('cypher-aggregation')
+project(':cypher-aggregation').projectDir = file('cypher-aggregation')
+
+include('triplet-graph-builder')
+project(':triplet-graph-builder').projectDir = file('triplet-graph-builder')
+
+include('legacy-cypher-projection')
+project(':legacy-cypher-projection').projectDir = file('legacy-cypher-projection')
+
+include('cypher-core')
+project(':cypher-core').projectDir = file('cypher/cypher-core')
+
+include('doc')
+project(':doc').projectDir = file('doc')
+
+include('doc-test-tools')
+project(':doc-test-tools').projectDir = file('doc-test-tools')
+
+include('doc-test')
+project(':doc-test').projectDir = file('doc-test')
+
+include('edition-api')
+project(':edition-api').projectDir = file('edition-api')
+
+include('executor')
+project(':executor').projectDir = file('executor')
+
+include('graph-store-catalog-applications')
+project(':graph-store-catalog-applications').projectDir = file('applications/graph-store-catalog')
+
+include('model-catalog-applications')
+project(':model-catalog-applications').projectDir = file('applications/model-catalog')
+
+include('operations-applications')
+project(':operations-applications').projectDir = file('applications/operations')
+
+include('centrality-algorithms')
+project(':centrality-algorithms').projectDir = file('applications/algorithms/centrality')
+
+include('community-algorithms')
+project(':community-algorithms').projectDir = file('applications/algorithms/community')
+
+include('miscellaneous-algorithms')
+project(':miscellaneous-algorithms').projectDir = file('applications/algorithms/miscellaneous-algorithms')
+
+include('node-embedding-algorithms')
+project(':node-embedding-algorithms').projectDir = file('applications/algorithms/node-embeddings')
+
+include('path-finding-algorithms')
+project(':path-finding-algorithms').projectDir = file('applications/algorithms/path-finding')
+
+include('similarity-algorithms')
+project(':similarity-algorithms').projectDir = file('applications/algorithms/similarity')
+
+include('applications-facade')
+project(':applications-facade').projectDir = file('applications/facade')
+
+include('algorithms-machinery')
+project(':algorithms-machinery').projectDir = file('applications/algorithms/machinery')
+
+include 'procedure-collector'
+project(':procedure-collector').projectDir = file('procedure-collector')
+
+include('graph-dimensions')
+project(':graph-dimensions').projectDir = file('graph-dimensions')
+
+include('graph-projection-api')
+project(':graph-projection-api').projectDir = file('graph-projection-api')
+
+include('graph-schema-api')
+project(':graph-schema-api').projectDir = file('graph-schema-api')
+
+include 'io-core'
+project(':io-core').projectDir = file('io/core')
+
+include('licensing')
+project(':licensing').projectDir = file('licensing')
+
+include('logging')
+project(':logging').projectDir = file('logging')
+
+include 'neo4j-log-adapter'
+project(':neo4j-log-adapter').projectDir = file('neo4j-log-adapter')
+
+include('proc-machine-learning')
+project(':proc-machine-learning').projectDir = file('proc/machine-learning')
+
+include('memory-estimation')
+project(':memory-estimation').projectDir = file('memory-estimation')
+
+include('memory-usage')
+project(':memory-usage').projectDir = file('memory-usage')
+
+include('metrics-api')
+project(':metrics-api').projectDir = file('metrics-api')
+
+include('ml-core')
+project(':ml-core').projectDir = file('ml/ml-core')
+
+include('ml-algo')
+project(':ml-algo').projectDir = file('ml/ml-algo')
+
+include('ml-test-utils')
+project(':ml-test-utils').projectDir = file('ml/ml-test-utils')
+
+include('ml-api')
+project(':ml-api').projectDir = file('ml/ml-api')
+
+include('model-catalog-api')
+project(':model-catalog-api').projectDir = file('model-catalog-api')
+
+include('native-projection')
+project(':native-projection').projectDir = file('native-projection')
+
+include('neo4j-adapter')
+project(':neo4j-adapter').projectDir = file('neo4j-adapter')
+
+include('neo4j-kernel-adapter')
+project(':neo4j-kernel-adapter').projectDir = file('compatibility/common/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-api')
+project(':neo4j-kernel-adapter-api').projectDir = file('compatibility/api/neo4j-kernel-adapter')
+
+include('neo4j-api')
+project(':neo4j-api').projectDir = file('neo4j-api')
+
+include('neo4j-settings')
+project(':neo4j-settings').projectDir = file('neo4j-settings')
+
+include('open-licensing')
+project(':open-licensing').projectDir = file('open-licensing')
+
+include('open-model-catalog')
+project(':open-model-catalog').projectDir = file('open-model-catalog')
+
+include('open-packaging')
+project(':open-packaging').projectDir = file('open-packaging')
+
+include('pipeline')
+project(':pipeline').projectDir = file('pipeline')
+
+include('pregel')
+project(':pregel').projectDir = file('pregel')
+
+include('pregel-example')
+project(':pregel-example').projectDir = file('examples/pregel-example')
+
+include('pregel-proc-generator')
+project(':pregel-proc-generator').projectDir = file('pregel-proc-generator')
+
+include('proc')
+project(':proc').projectDir = file('proc')
+
+include('proc-catalog')
+project(':proc-catalog').projectDir = file('proc/catalog')
+
+include('proc-centrality')
+project(':proc-centrality').projectDir = file('proc/centrality')
+
+include('proc-common')
+project(':proc-common').projectDir = file('proc/common')
+
+include('proc-community')
+project(':proc-community').projectDir = file('proc/community')
+
+include('proc-embeddings')
+project(':proc-embeddings').projectDir = file('proc/embeddings')
+
+include('proc-misc')
+project(':proc-misc').projectDir = file('proc/misc')
+
+include('proc-path-finding')
+project(':proc-path-finding').projectDir = file('proc/path-finding')
+
+include('proc-pregel')
+project(':proc-pregel').projectDir = file('proc/pregel')
+
+include('proc-similarity')
+project(':proc-similarity').projectDir = file('proc/similarity')
+
+include('proc-sysinfo')
+project(':proc-sysinfo').projectDir = file('proc/sysinfo')
+
+include('proc-test')
+project(':proc-test').projectDir = file('proc/test')
+
+include('proc-pipeline-catalog')
+project(':proc-pipeline-catalog').projectDir = file('proc/pipeline-catalog')
+
+include('opengds-extension')
+project(':opengds-extension').projectDir = file('procedures/extension')
+
+include('procedure-integration')
+project(':procedure-integration').projectDir = file('procedures/integration')
+
+include('opengds-procedure-facade')
+project(':opengds-procedure-facade').projectDir = file('procedures/facade')
+
+include('algorithms-procedure-facade')
+project(':algorithms-procedure-facade').projectDir = file('procedures/algorithms-facade')
+
+include('operations-procedure-facade')
+project(':operations-procedure-facade').projectDir = file('procedures/operations-facade')
+
+include 'graph-catalog-procedure-facade'
+project(':graph-catalog-procedure-facade').projectDir = file('procedures/graph-catalog-facade')
+
+include 'model-catalog-procedure-facade'
+project(':model-catalog-procedure-facade').projectDir = file('procedures/model-catalog-facade')
+
+include('progress-tracking')
+project(':progress-tracking').projectDir = file('progress-tracking')
+
+include('string-formatting')
+project(':string-formatting').projectDir = file('string-formatting')
+
+include('subgraph-filtering')
+project(':subgraph-filtering').projectDir = file('subgraph-filtering')
+
+include 'termination'
+project(':termination').projectDir = file('termination')
+
+include('graph-sampling')
+project(':graph-sampling').projectDir = file('graph-sampling')
+
+include('test-graph-loaders')
+project(':test-graph-loaders').projectDir = file('test-graph-loaders')
+
+include('test-utils')
+project(':test-utils').projectDir = file('test-utils')
+
+include('transaction')
+project(':transaction').projectDir = file('transaction')
+
+include('open-write-services')
+project(':open-write-services').projectDir = file('open-write-services')
+
+include('defaults-and-limits-configuration')
+project(':defaults-and-limits-configuration').projectDir = file('defaults-and-limits-configuration')
+
+
+
+include('neo4j-kernel-adapter-5.17')
+project(':neo4j-kernel-adapter-5.17').projectDir = file('compatibility/5.17/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-5.18')
+project(':neo4j-kernel-adapter-5.18').projectDir = file('compatibility/5.18/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-5.19')
+project(':neo4j-kernel-adapter-5.19').projectDir = file('compatibility/5.19/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-5.20')
+project(':neo4j-kernel-adapter-5.20').projectDir = file('compatibility/5.20/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-5.21')
+project(':neo4j-kernel-adapter-5.21').projectDir = file('compatibility/5.21/neo4j-kernel-adapter')
+
+include('neo4j-kernel-adapter-5.22')
+project(':neo4j-kernel-adapter-5.22').projectDir = file('compatibility/5.22/neo4j-kernel-adapter')

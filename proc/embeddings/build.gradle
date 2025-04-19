@@ -1,0 +1,54 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Embeddings'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    api project(':proc-common')
+
+    implementation project(':algo-common')
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':executor')
+    implementation project(':logging')
+    implementation project(':ml-core')
+    implementation project(':graph-schema-api')
+    implementation project(':model-catalog-api')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':transaction')
+    implementation project(':ml-algo')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+
+    testCompileOnly openGds.immutables.builder
+
+    testImplementation project(':native-projection')
+    testImplementation project(':open-model-catalog')
+    testImplementation project(':proc-test')
+    testImplementation project(':licensing')
+    testImplementation project(':open-licensing')
+    testImplementation project(':test-utils')
+
+    testImplementation project(':opengds-extension')
+}

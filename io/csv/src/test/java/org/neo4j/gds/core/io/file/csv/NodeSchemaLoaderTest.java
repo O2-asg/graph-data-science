@@ -1,0 +1,193 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.neo4j.gds.core.io.file.csv;
+
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.neo4j.gds.NodeLabel;
+import org.neo4j.gds.api.DefaultValue;
+import org.neo4j.gds.api.PropertyState;
+import org.neo4j.gds.api.nodeproperties.ValueType;
+import org.neo4j.gds.api.schema.MutableNodeSchemaEntry;
+import org.neo4j.gds.api.schema.PropertySchema;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.neo4j.gds.core.io.file.csv.CsvNodeSchemaVisitor.NODE_SCHEMA_FILE_NAME;
+import static org.neo4j.gds.core.io.file.csv.CsvSchemaConstants.NODE_SCHEMA_COLUMNS;
+
+class NodeSchemaLoaderTest {
+
+    @TempDir
+    Path exportDir;
+
+    static Stream<List<String>> correctLines() {
+        return Stream.of(
+            List.of(
+                String.join(", ", NODE_SCHEMA_COLUMNS),
+                "A, prop1, long, DefaultValue(42), PERSISTENT",
+                "B, prop2, double, DefaultValue(13.37), TRANSIENT"
+            )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("correctLines")
+    void shouldLoadNodeSchemaCorrectly(Collection<String> lines) throws IOException {
+        var nodeSchemaFile = exportDir.resolve(NODE_SCHEMA_FILE_NAME).toFile();
+        FileUtils.writeLines(nodeSchemaFile, lines);
+
+        var schemaLoader = new NodeSchemaLoader(exportDir);
+        var nodeSchema = schemaLoader.load();
+
+        assertThat(nodeSchema).isNotNull();
+
+        assertThat(nodeSchema.availableLabels()).containsExactlyInAnyOrder(NodeLabel.of("A"), NodeLabel.of("B"));
+
+        var labelAProperties = nodeSchema.get(NodeLabel.of("A"));
+        assertThat(labelAProperties)
+            .isEqualTo(new MutableNodeSchemaEntry(
+                NodeLabel.of("A"),
+                Map.of(
+                    "prop1",
+                    PropertySchema.of(
+                        "prop1",
+                        ValueType.LONG,
+                        DefaultValue.of(42L),
+                        PropertyState.PERSISTENT
+                    )
+                )
+            ));
+
+        var labelBProperties = nodeSchema.get(NodeLabel.of("B"));
+        assertThat(labelBProperties)
+            .isEqualTo(new MutableNodeSchemaEntry(
+                NodeLabel.of("B"),
+                Map.of(
+                    "prop2",
+                    PropertySchema.of(
+                        "prop2",
+                        ValueType.DOUBLE,
+                        DefaultValue.of(13.37D),
+                        PropertyState.TRANSIENT
+                    )
+                )
+            ));
+    }
+
+    static Stream<List<String>> linesWithoutProperties() {
+        return Stream.of(
+            List.of(
+                String.join(", ", NODE_SCHEMA_COLUMNS),
+                "A",
+                "B"
+            )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("linesWithoutProperties")
+    void shouldLoadSchemaWithoutProperties(Collection<String> lines) throws IOException {
+        var nodeSchemaFile = exportDir.resolve(NODE_SCHEMA_FILE_NAME).toFile();
+        FileUtils.writeLines(nodeSchemaFile, lines);
+
+        var schemaLoader = new NodeSchemaLoader(exportDir);
+        var nodeSchema = schemaLoader.load();
+
+        assertThat(nodeSchema).isNotNull();
+        assertThat(nodeSchema.availableLabels()).containsExactlyInAnyOrder(NodeLabel.of("A"), NodeLabel.of("B"));
+    }
+
+    static Stream<List<String>> mixedLines() {
+        return Stream.of(
+            List.of(
+                String.join(", ", NODE_SCHEMA_COLUMNS),
+                "A, prop1, long, DefaultValue(42), PERSISTENT",
+                "B"
+            )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("mixedLines")
+    void shouldLoadMixedLabels(List<String> lines) throws IOException {
+        var nodeSchemaFile = exportDir.resolve(NODE_SCHEMA_FILE_NAME).toFile();
+        FileUtils.writeLines(nodeSchemaFile, lines);
+
+        var schemaLoader = new NodeSchemaLoader(exportDir);
+        var nodeSchema = schemaLoader.load();
+
+        assertThat(nodeSchema).isNotNull();
+
+        assertThat(nodeSchema.availableLabels()).containsExactlyInAnyOrder(NodeLabel.of("A"), NodeLabel.of("B"));
+
+        var labelAProperties = nodeSchema.get(NodeLabel.of("A"));
+        assertThat(labelAProperties)
+            .isEqualTo(new MutableNodeSchemaEntry(
+                NodeLabel.of("A"),
+                Map.of(
+                    "prop1",
+                    PropertySchema.of(
+                        "prop1",
+                        ValueType.LONG,
+                        DefaultValue.of(42L),
+                        PropertyState.PERSISTENT
+                    )
+                )
+            ));
+
+        var labelBProperties = nodeSchema.get(NodeLabel.of("B"));
+        assertThat(labelBProperties)
+            .isEqualTo(new MutableNodeSchemaEntry(NodeLabel.of("B"), Map.of()));
+    }
+
+    static Stream<List<String>> arrayLines() {
+        return Stream.of(
+            List.of(
+                String.join(", ", NODE_SCHEMA_COLUMNS),
+                "A, prop1, double[], \"DefaultValue([42.0,13.37])\", PERSISTENT"
+            )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("arrayLines")
+    void shouldReadArrayDefaultValues(Collection<String> lines) throws IOException {
+        var nodeSchemaFile = exportDir.resolve(NODE_SCHEMA_FILE_NAME).toFile();
+        FileUtils.writeLines(nodeSchemaFile, lines);
+
+        var schemaLoader = new NodeSchemaLoader(exportDir);
+        var nodeSchema = schemaLoader.load();
+
+        assertThat(nodeSchema).isNotNull();
+
+        assertThat(nodeSchema.availableLabels()).containsExactlyInAnyOrder(NodeLabel.of("A"));
+        assertThat(nodeSchema.get(NodeLabel.of("A")).properties().get("prop1").defaultValue().doubleArrayValue())
+            .containsExactly(42.0, 13.37);
+    }
+}

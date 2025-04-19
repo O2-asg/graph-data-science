@@ -1,0 +1,57 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Similarity'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    api project(':proc-common')
+
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':algo-common')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':executor')
+    implementation project(':graph-schema-api')
+    implementation project(':logging')
+    implementation project(':memory-usage')
+    implementation project(':neo4j-api')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+    implementation project(':transaction')
+
+    implementation openGds.hdrhistogram
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+
+    testImplementation project(':proc-test')
+    testImplementation project(':proc-common')
+    testImplementation project(':ml-core')
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+
+
+    testImplementation project(':opengds-extension')
+}

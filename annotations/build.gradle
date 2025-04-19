@@ -1,0 +1,21 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Annotations'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor openGds.recordBuilder
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.recordBuilder
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.assertj.core
+}

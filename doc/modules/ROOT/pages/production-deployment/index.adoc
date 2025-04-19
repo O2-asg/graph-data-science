@@ -1,0 +1,13 @@
+[[production-deployment]]
+= Production deployment
+:description: This chapter explains advanced details with regards to common Neo4j components.
+
+
+This chapter is divided into the following sections:
+
+* xref:production-deployment/defaults-and-limits.adoc[Defaults and Limits]
+* xref:production-deployment/transaction-handling.adoc[Transaction Handling]
+* xref:production-deployment/composite.adoc[Using GDS and Composite databases]
+* xref:production-deployment/neo4j-cluster.adoc[GDS with Neo4j cluster]
+* xref:production-deployment/configuration-settings.adoc[GDS Configuration Settings]
+* xref:production-deployment/feature-toggles.adoc[GDS Feature Toggles]

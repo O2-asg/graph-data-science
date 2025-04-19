@@ -1,0 +1,55 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Test'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':config-generator')
+    annotationProcessor project(':procedure-collector')
+    annotationProcessor openGds.immutables.value
+    compileOnly project(':annotations')
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.immutables.builder
+    compileOnly openGds.jetbrains.annotations
+
+    implementation openGds.reflections
+
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':algo-common')
+    implementation project(':algo-test')
+    implementation project(':applications-facade')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':defaults-and-limits-configuration')
+    implementation project(':executor')
+    implementation project(':graph-schema-api')
+    implementation project(':graph-store-catalog-applications')
+    implementation project(':licensing')
+    implementation project(':logging')
+    implementation project(':memory-estimation')
+    implementation project(':memory-usage')
+    implementation project(':model-catalog-applications')
+    implementation project(':neo4j-api')
+    implementation project(':neo4j-log-adapter')
+    implementation project(':node-embedding-algorithms')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':open-licensing')
+    implementation project(':open-model-catalog')
+    implementation project(':pregel')
+    implementation project(':procedure-integration')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+    implementation project(':transaction')
+
+    api project(':proc-catalog')
+    api project(':proc-common')
+    api project(':test-utils')
+
+    testCompileOnly project(':annotations')
+    testCompileOnly openGds.jetbrains.annotations
+
+}

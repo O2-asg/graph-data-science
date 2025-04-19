@@ -1,0 +1,68 @@
+[[graph-catalog-ops]]
+= Graph management
+:description: This section details the graph catalog operations available to manage graphs within the Neo4j Graph Data Science library.
+// aliases for old pages which were split into multiple and have no 1:1 redirect
+:page-aliases: graph-catalog-node-ops, graph-catalog-relationship-ops, graph-catalog-export-ops, management-ops/graph-catalog-export-ops, management-ops/graph-catalog-ops
+
+A _graph_ in GDS is an in-memory structure containing _nodes_ connected by _relationships_. Both nodes and relationships can hold numerical attributes (_properties_).
+Graphs are stored using compressed data structures optimized for topology and property lookup operations.
+
+Each graph has a name that can be used as a reference for management operations, or in analytical workflows that require the same graph to be processed several times. These references are stored in the _graph catalog_.
+
+
+[NOTE]
+====
+The graph catalog exists as long as the Neo4j instance is running.
+When Neo4j is restarted, graphs stored in the catalog are lost.
+See xref:management-ops/backup-restore.adoc[] to learn how to persist your graph projections.
+====
+
+
+== Catalog operations
+
+You can xref:management-ops/graph-creation/index.adoc[create] a graph in multiple ways, depending on whether the source data is in a Neo4j database, an external source, an existing GDS graph, or random data.
+
+Once it has been created, a reference to the graph is stored in the graph catalog.
+You can xref:management-ops/graph-list.adoc[get information on graphs] to verify that the graph has been successfully created, and to retrieve a list of all the graphs in memory.
+
+You can also xref:management-ops/graph-drop.adoc[drop] a graph from the catalog when it is not longer useful.
+
+// TODO [nvitucci] maybe not here
+// TODO - reuse image from common usage but greying out the other components
+
+== Graph operations
+
+=== Read
+
+The properties stored in the nodes and relationships of a graph can be retrieved using the `stream` methods on xref:management-ops/graph-reads/graph-stream-nodes.adoc[nodes] and xref:management-ops/graph-reads/graph-stream-relationships.adoc[relationships] respectively.
+In the Enterprise Edition, similar operations can be performed more efficiently using xref:management-ops/graph-export/graph-catalog-apache-arrow-ops.adoc[Apache Arrow].
+
+
+=== Update
+
+In-memory graphs are usually updated by algorithms running in `mutate` mode, which add new properties to nodes or relationships.
+
+Besides, you can xref:management-ops/graph-update/mutate-node-labels.adoc[update node labels], xref:management-ops/graph-update/to-undirected.adoc[convert relationships] from directed to undirected, and xref:management-ops/graph-update/collapse-path.adoc[collapse path].
+You can also drop xref:management-ops/graph-update/dropping-parts.adoc#catalog-graph-remove-node-properties-example[node properties] and xref:management-ops/graph-update/dropping-parts.adoc#catalog-graph-delete-rel-type[relationships of a given type].
+
+
+=== Write to Neo4j
+
+To persist the computations, you can write xref:management-ops/graph-write-to-neo4j/write-back-to-nodes.adoc#catalog-graph-write-node-properties-example[node properties], xref:management-ops/graph-write-to-neo4j/write-back-to-nodes.adoc#catalog-graph-write-node-label-example[node labels], and xref:management-ops/graph-write-to-neo4j/write-back-relationships.adoc#catalog-graph-write-relationship-example[relationships] back to Neo4j.
+
+=== Export
+
+A whole graph can be exported by creating a xref:management-ops/graph-export/export-db.adoc[new Neo4j database].
+To save or use the graph outside of Neo4j, you can export the graph using  xref:management-ops/graph-export/graph-catalog-apache-arrow-ops.adoc[Apache Arrow] or to disk as xref:management-ops/graph-export/graph-export-csv.adoc[Csv].
+
+
+== Administration
+
+=== Backup and restore
+
+You can backup a graph so that it can be restored after dropping it by mistake, or after a database restart. See the xref:management-ops/backup-restore.adoc[] section for examples.
+
+=== Access control
+
+Catalog operations on named graphs are bound to a specific database user.
+Graphs projected by a different database user are not accessible at any time, except for xref:management-ops/administration.adoc[administrator users].

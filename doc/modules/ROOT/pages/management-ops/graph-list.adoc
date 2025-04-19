@@ -1,0 +1,237 @@
+[[catalog-graph-list]]
+= Listing graphs
+:description: This section details how to list graphs stored in the graph catalog of the Neo4j Graph Data Science library.
+:page-aliases: graph-list
+
+Information about graphs in the catalog can be retrieved using the `gds.graph.list()` procedure.
+
+
+== Syntax
+
+[.graph-list-syntax]
+--
+.List information about graphs in the catalog:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.list(
+  graphName: String
+) YIELD
+  graphName: String,
+  database: String,
+  databaseLocation: String,
+  configuration: Map,
+  nodeCount: Integer,
+  relationshipCount: Integer,
+  schema: Map,
+  schemaWithOrientation: Map,
+  degreeDistribution: Map,
+  density: Float,
+  creationTime: Datetime,
+  modificationTime: Datetime,
+  sizeInBytes: Integer,
+  memoryUsage: String
+----
+
+.Parameters
+[opts="header",cols="1,1,1,4"]
+|===
+| Name      | Type   | Optional | Description
+| graphName | String | yes      | The name under which the graph is stored in the catalog. If no graph name is given, information about all graphs will be listed. If a graph name is given but not found in the catalog, an empty list will be returned.
+|===
+
+.Results
+[opts="header",cols="3m,1,6"]
+|===
+| Name                   | Type     | Description
+| graphName              | String   | Name of the graph.
+| database               | String   | Name of the database in which the graph has been projected.
+| databaseLocation       | String   | Location of the database from which the graph has been projected. Can be one of `local`, `remote` or `none`.
+| configuration          | Map      | The configuration used to project the graph in memory.
+| nodeCount              | Integer  | Number of nodes in the graph.
+| relationshipCount      | Integer  | Number of relationships in the graph.
+| schema footnote:deprecated[In the next major release this field will get the semantics of `schemaWithOrientation`.]                | Map      | Node labels, relationship types and properties contained in the projected graph.
+| schemaWithOrientation  | Map      | Node labels, relationship types, relationship orientation and properties contained in the projected graph.
+| degreeDistribution     | Map      | Histogram of degrees in the graph.
+| density                | Float    | Density of the graph.
+| creationTime           | Datetime | Time when the graph was projected.
+| modificationTime       | Datetime | Time when the graph was last modified.
+| sizeInBytes            | Integer  | Number of bytes used in the Java heap to store the graph. This feature is not supported on all JDKs and might return -1 instead.
+| memoryUsage            | String   | Human readable description of `sizeInBytes`. This feature is not supported on all JDKs and might return null instead.
+|===
+--
+
+The information contains basic statistics about the graph, e.g., the node and relationship count.
+The result field `creationTime` indicates when the graph was projected in memory.
+The result field `modificationTime` indicates when the graph was updated by an algorithm running in `mutate` mode.
+
+The `database` column refers to the name of the database the corresponding graph has been projected on.
+Referring to a named graph in a procedure is only allowed on the database it has been projected on.
+
+The `schema` consists of information about the nodes and relationships stored in the graph.
+For each node label, the schema maps the label to its property keys and their corresponding property types.
+Similarly, the schema maps the relationship types to their property keys and property types.
+The property type is either `Integer`, `Float`, `List of Integer` or `List of Float`.
+
+The `schemaWithOrientation` is an extended version of the `schema`, where for each relationship types it maps to their orientation and properties.
+
+The `degreeDistribution` field can be fairly time-consuming to compute for larger graphs.
+Its computation is cached per graph, so subsequent listing for the same graph will be fast.
+To avoid computing the degree distribution, specify a `YIELD` clause that omits it.
+Note that not specifying a `YIELD` clause is the same as requesting all possible return fields to be returned.
+
+The `density` is the result of `relationshipCount` divided by the maximal number of relationships for a simple graph with the given `nodeCount`.
+
+
+== Examples
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+In order to demonstrate the GDS Graph List capabilities we are going to create a small social network graph in Neo4j.
+
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  (florentin:Person { name: 'Florentin', age: 16 }),
+  (adam:Person { name: 'Adam', age: 18 }),
+  (veselin:Person { name: 'Veselin', age: 20 }),
+  (florentin)-[:KNOWS { since: 2010 }]->(adam),
+  (florentin)-[:KNOWS { since: 2018 }]->(veselin)
+----
+
+Additionally, we will project a few graphs to the graph catalog, for more details see xref:management-ops/graph-creation/graph-project-cypher-projection.adoc[Cypher projections] and xref:management-ops/graph-creation/graph-project.adoc[native projections].
+
+.Project `Person` nodes and `KNOWS` relationships using Cypher projections:
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (n:Person)
+OPTIONAL MATCH (n)-[r:KNOWS]->(m:Person)
+RETURN gds.graph.project('personsCypher', n, m,
+  {
+    sourceNodeLabels: labels(n),
+    targetNodeLabels: labels(m),
+    relationshipType: type(r)
+  }
+)
+----
+
+.Project `Person` nodes with property `age` and `KNOWS` relationships using Cypher projections:
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (n:Person)
+OPTIONAL MATCH (n)-[r:KNOWS]->(m:Person)
+RETURN gds.graph.project('personsWithAgeCypher', n, m,
+  {
+    sourceNodeLabels: labels(n),
+    targetNodeLabels: labels(m),
+    sourceNodeProperties: n { .age },
+    targetNodeProperties: m { .age },
+    relationshipType: type(r)
+  }
+)
+----
+
+.Project `Person` nodes and `KNOWS` relationships using native projections:
+[source, cypher, role=noplay graph-project-query]
+----
+CALL gds.graph.project('personsNative', 'Person', 'KNOWS')
+----
+
+=== List basic information about all graphs in the catalog
+
+[role=query-example]
+--
+.List basic information about all graphs in the catalog:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.list()
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount
+ORDER BY graphName ASC
+----
+
+.Results
+[opts="header",cols="1,1,1"]
+|===
+| graphName              | nodeCount   | relationshipCount
+| "personsCypher"        | 3           | 2
+| "personsNative"        | 3           | 2
+| "personsWithAgeCypher" | 3           | 2
+|===
+--
+
+
+=== List extended information about a specific named graph in the catalog
+
+[role=query-example]
+--
+.List extended information about a specific Cypher named graph in the catalog:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.list('personsCypher')
+YIELD graphName, configuration, schemaWithOrientation
+RETURN graphName, configuration.query AS query, schemaWithOrientation
+----
+
+.Results
+[opts="header"]
+|===
+| graphName | query | schemaWithOrientation
+| "personsCypher"
+| "MATCH (n:Person)
+OPTIONAL MATCH (n)-[r:KNOWS]\->(m:Person)
+RETURN gds.graph.project('personsCypher', n, m,
+  {
+    sourceNodeLabels: labels(n),
+    targetNodeLabels: labels(m),
+    relationshipType: type(r)
+  }
+)"
+| {graphProperties={}, nodes={Person={}}, relationships={KNOWS={direction="DIRECTED", properties={}}}}
+|===
+--
+
+[role=query-example]
+--
+.List extended information about a specific native named graph in the catalog:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.list('personsNative')
+YIELD graphName, schemaWithOrientation, configuration
+RETURN graphName, schemaWithOrientation, configuration.nodeProjection AS nodeProjection
+----
+
+.Results
+[opts="header"]
+|===
+| graphName | schemaWithOrientation | nodeProjection
+| "personsNative"
+| {graphProperties={}, nodes={Person={}}, relationships={KNOWS={direction="DIRECTED", properties={}}}}
+| {Person={label="Person", properties={}}}
+|===
+--
+
+The above examples demonstrate that `nodeProjection` and `relationshipProjection` only have a value when the graph is projected using native projection while `query` is present when we have a Cypher projected graph.
+
+Despite different result columns being present for the different projections that we can use, other data such as the Graph Schema is the same, as we can see in the examples above.
+
+
+=== Degree distribution of a specific graph
+
+[role=query-example]
+--
+.List information about the degree distribution of a specific graph:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.list('personsNative')
+YIELD graphName, degreeDistribution;
+----
+
+.Results
+[opts="header",cols="2,8"]
+|===
+| graphName       | degreeDistribution
+| "personsNative"
+| {max=2, mean=0.6666666667, min=0, p50=0, p75=2, p90=2, p95=2, p99=2, p999=2}
+|===
+--

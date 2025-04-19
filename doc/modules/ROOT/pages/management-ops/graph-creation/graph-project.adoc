@@ -1,0 +1,704 @@
+[[catalog-graph-project]]
+= Native projection
+:description: This section details projecting GDS graphs using `native` projections.
+:page-aliases: management-ops/projections/graph-project.adoc
+
+
+Native projections are the easiest way to create a xref:management-ops/index.adoc[GDS graph] from a Neo4j database.
+A native projection is entirely described by configuration parameters.
+
+_Node projections_ and _relationship projections_ describe the way nodes and relationships are loaded (_projected_) from the database into the in-memory graph.
+While node projections are based on node labels, relationship projections are based on relationship types.
+Both can include properties.
+
+
+== Considerations
+
+=== Lifecycle
+
+Projected graphs reside in memory (in the graph catalog) until any of the following happens:
+
+- The graph is dropped with the xref:management-ops/graph-drop.adoc[`gds.graph.drop`] procedure.
+- The Neo4j database from which the graph was projected is stopped or dropped.
+- The Neo4j DBMS is stopped.
+
+
+=== Node property support
+
+Native projections can only project a limited set of node property types from the Neo4j database.
+The xref:management-ops/graph-creation/index.adoc#node-properties-supported[Node Properties page] details which node property types are supported.
+Other types of node properties have to be transformed or encoded into one of the supported types in order to be projected using a native projection.
+
+
+[[graph-project-native-syntax]]
+== Syntax
+
+[.graph-project-syntax]
+--
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  graphName: String,
+  nodeProjection: String or List or Map,
+  relationshipProjection: String or List or Map,
+  configuration: Map
+) YIELD
+  graphName: String,
+  nodeProjection: Map,
+  nodeCount: Integer,
+  relationshipProjection: Map,
+  relationshipCount: Integer,
+  projectMillis: Integer
+----
+
+.Parameters
+[opts="header",cols="1,1,1,4"]
+|===
+| Name                  | Type                | Optional | Description
+| graphName             | String              | no       | The name under which the graph is stored in the catalog.
+| nodeProjection        | String, List or Map | no       | One or more xref:management-ops/graph-creation/graph-project.adoc#node-projection-syntax[node projections].
+| relationshipProjection| String, List or Map | no       | One or more xref:management-ops/graph-creation/graph-project.adoc#relationship-projection-syntax[relationship projections].
+| configuration         | Map                 | yes      | <<graph-project-native-syntax-configuration, Additional parameters>> to configure the native projection.
+|===
+
+[[graph-project-native-syntax-configuration]]
+.Configuration
+[opts="header",cols="1,1,1,4"]
+|===
+| Name                   | Type                  | Default              | Description
+| readConcurrency        | Integer               | 4                    | The number of concurrent threads used for creating the graph.
+| nodeProperties         | String, List or Map   | {}                   | The node properties to load from nodes that match _any_ of the labels specified in `nodeProjection`.
+| relationshipProperties | String, List or Map   | {}                   | The relationship properties to load from relationships that match _any_ of the types specified in `relationshipProjection`.
+| validateRelationships  | Boolean               | false                | Whether to throw an error if the `relationshipProjection` includes relationships between nodes not part of the `nodeProjection`.
+| jobId                  | String                | Generated internally | An ID that can be provided to more easily track the projection's progress.
+|===
+
+.Results
+[opts="header",cols="2,1,4"]
+|===
+| Name                   | Type     | Description
+| graphName              | String   | The name under which the graph is stored in the catalog.
+| nodeProjection         | Map      | The xref:management-ops/graph-creation/graph-project.adoc#node-projection-syntax[node projections] used to project the graph.
+| nodeCount              | Integer  | The number of nodes stored in the projected graph.
+| relationshipProjection | Map      | The xref:management-ops/graph-creation/graph-project.adoc#relationship-projection-syntax[relationship projections] used to project the graph.
+| relationshipCount      | Integer  | The number of relationships stored in the projected graph.
+| projectMillis          | Integer  | Milliseconds for projecting the graph.
+|===
+--
+
+
+[[node-projection-syntax]]
+=== Node projection
+
+A node projection can be specified using any of the following forms:
+
+* A single string (either a Neo4j node label `<label>` or a wildcard `*`)
+* A list of Neo4j node labels (`[<label_1>, <label_2>, <label_3>]`)
+* A projection map, where each key is a node label in the projected graph and each value is itself a map
+
+The projection map is specified as follows:
+
+----
+{
+    <projected_label_1>: {                       <1>
+        label: <label_1>,                        <2>
+        properties: <prop_1>                     <3>
+    },
+    <projected_label_2>: {
+        label: <label_2>,
+        properties: [<prop_1>, <prop_2>, ...]    <3>
+    },
+    <projected_label_3>: {
+        label: <label_3>,
+        properties: {                            <3>
+            <projected_prop_1>: {                <4>
+                property: <prop_1>,              <5>
+                defaultValue: <default_1>        <6>
+            },
+            <projected_prop_2>: {
+                property: <prop_2>,
+                defaultValue: <default_2>
+            },
+            ...
+        }
+    },
+    ...
+}
+----
+<1> Node label to create in the projected graph. It can be the same as the corresponding Neo4j node label.
+<2> Source Neo4j node label as a string. Default: same as the projected label (`<projected_label_1>` here).
+<3> Node property projection, specified as a single Neo4j node property, a list of Neo4j node properties, or a projection map. Default: empty map.
+<4> Node property to create in the projected graph. It can be the same as the corresponding Neo4j node property.
+<5> Source Neo4j node property as a string. Default: same as the projected property name (`<projected_prop_1>` here).
+<6> Default value if the property is not defined for a node. Default: a xref:management-ops/graph-creation/index.adoc#node-properties-supported[fallback value] depending on the property type.
+
+==== Notes
+
+* When specified as a string or a list, the projection does not include any node properties.
+
+* The wildcard form does not retain the labels on the projected nodes.
+Node labels are useful with algorithms that fully support xref:introduction.adoc#introduction-algorithms-traits[heterogeneous nodes].
+The <<all-labels-example>> example shows how to retain all the labels for these cases.
+
+* All nodes with _any_ of the specified node labels are projected into the GDS graph.
+
+* All specified node labels and properties must exist in the database.
+You can use the https://neo4j.com/docs/operations-manual/current/reference/procedures/#procedure_db_createproperty[`db.createProperty()`] procedure to create a new node property without modifying the database.
+
+
+[[relationship-projection-syntax]]
+=== Relationship projection
+
+A Relationship projection can be specified using any of the following forms:
+
+* A single string (either a Neo4j relationship type `<type>` or a wildcard `*`)
+* A list of Neo4j relationship types (`[<type_1>, <type_2>, <type_3>]`)
+* A projection map, where each key is a relationship type in the projected graph and each value is itself a map
+
+The projection map is specified as follows:
+
+----
+{
+    <projected_type_1>: {                        <1>
+        type: <type_1>,                          <2>
+        orientation: <orientation_1>,            <3>
+        aggregation: <aggregation_1>,            <4>
+        properties: <prop_1>                     <5>
+    },
+    <projected_type_2>: {
+        type: <type_2>,
+        orientation: <orientation_2>,
+        aggregation: <aggregation_2>,
+        properties: [<prop_1>, <prop_2>, ...]    <5>
+    },
+    <projected_type_3>: {
+        type: <type_3>,
+        orientation: <orientation_3>,
+        aggregation: <aggregation_3>,
+        properties: {                            <5>
+            <projected_prop_1>: {                <6>
+                property: <prop_1>,              <7>
+                defaultValue: <default_1>,       <8>
+                aggregation: <aggregation_1>     <9>
+            },
+            <projected_prop_2>: {
+                property: <prop_2>,
+                defaultValue: <default_2>,
+                aggregation: <aggregation_2>
+            },
+            ...
+        }
+    },
+    ...
+}
+----
+<1> Relationship type to create in the projected graph. It can be the same as the corresponding Neo4j relationship type.
+<2> Source Neo4j relationship type as a string. Default: same as the projected type (`<projected_type_1>` here).
+<3> Relationship orientation in the projected graph. Allowed values: `NATURAL` (default, same as orientation in the Neo4j graph), `UNDIRECTED` (makes all relationships undirected), `REVERSE` (reverses the orientation for all relationships).
+<4> Handling of multiple instances of _all_ the relationship properties associated to the relationship. Allowed values: `NONE` (default), `SINGLE`, `COUNT`, `MIN`, `MAX`, `SUM`.
+<5> Relationship property projection, specified as a single Neo4j relationship property, a list of Neo4j relationship properties, or a projection map. Default: empty map.
+<6> Relationship property to create in the projected graph. It can be the same as the corresponding Neo4j relationship property.
+<7> Source Neo4j relationship property as a string. Default: same as the projected property (`<projected_prop_1>` here).
+<8> Default value if the property is not defined for a relationship. Default: `Double.NaN`.
+<9> Handling of multiple instances of a specific relationship property associated to the relationship. Allowed values: `NONE` (default), `SINGLE`, `COUNT`, `MIN`, `MAX`, `SUM`.
+
+==== Notes
+
+* When specified as a string or a list, the projection does not include any relationship properties.
+
+* The wildcard form does not retain the types on the projected relationships.
+Relationship types are useful with algorithms that fully support xref:introduction.adoc#introduction-algorithms-traits[heterogeneous relationships].
+The <<all-labels-example>> example shows how to retain all the relationships for these cases.
+
+* All relationships with any of the specified relationship types, and whose endpoint nodes are included in the <<node-projection-syntax, node projection>>, are projected into the GDS graph.
+The `validateRelationships` <<graph-project-native-syntax-configuration, configuration parameter>> controls whether to fail or silently discard relationships whose endpoint nodes are not included in the node projection.
+
+* All specified relationship types and properties must exist in the database.
+You can use the https://neo4j.com/docs/operations-manual/current/reference/procedures/#procedure_db_createproperty[`db.createProperty()`] procedure to create a new relationship property without modifying the database.
+
+
+[[graph-project-examples]]
+== Examples
+
+include::partial$/common-usage/examples-empty-db-note.adoc[]
+
+In order to demonstrate the GDS Graph Projection capabilities we are going to create a small social network graph in Neo4j.
+The example graph looks like this:
+
+image::example-graphs/graph-project-example.svg[Visualization of the example graph,align="center"]
+
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  (florentin:Person { name: 'Florentin', age: 16 }),
+  (adam:Person { name: 'Adam', age: 18 }),
+  (veselin:Person { name: 'Veselin', age: 20, ratings: [5.0] }),
+  (hobbit:Book { name: 'The Hobbit', isbn: 1234, numberOfPages: 310, ratings: [1.0, 2.0, 3.0, 4.5] }),
+  (frankenstein:Book { name: 'Frankenstein', isbn: 4242, price: 19.99 }),
+
+  (florentin)-[:KNOWS { since: 2010 }]->(adam),
+  (florentin)-[:KNOWS { since: 2018 }]->(veselin),
+  (florentin)-[:READ { numberOfPages: 4 }]->(hobbit),
+  (florentin)-[:READ { numberOfPages: 42 }]->(hobbit),
+  (adam)-[:READ { numberOfPages: 30 }]->(hobbit),
+  (veselin)-[:READ]->(frankenstein)
+----
+
+[[graph-project-example-single-label-type]]
+=== Simple graph
+
+A simple graph is a graph with only one node label and relationship type, i.e., a monopartite graph.
+We are going to start with demonstrating how to load a simple graph by projecting only the `Person` node label and `KNOWS` relationship type.
+
+[role=query-example]
+--
+.Project `Person` nodes and `KNOWS` relationships:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'persons',            // <1>
+  'Person',             // <2>
+  'KNOWS'               // <3>
+)
+YIELD
+  graphName AS graph, nodeProjection, nodeCount AS nodes, relationshipProjection, relationshipCount AS rels
+----
+<1> The name of the graph. Afterwards, `persons` can be used to run algorithms or manage the graph.
+<2> The nodes to be projected. In this example, the nodes with the `Person` label.
+<3> The relationships to be projected. In this example, the relationships of type `KNOWS`.
+
+.Results
+[opts="header", cols="1,3m,1,3m,1m"]
+|===
+| graph     | nodeProjection                         | nodes  | relationshipProjection                                                        | rels
+| "persons" | {Person={label="Person", properties={}}} | 3      | {KNOWS={aggregation="DEFAULT", indexInverse=false, orientation="NATURAL", properties={}, type="KNOWS"}} | 2
+|===
+--
+
+In the example above, we used a short-hand syntax for the node and relationship projection.
+The used projections are internally expanded to the full `Map` syntax as shown in the `Results` table.
+In addition, we can see the projected in-memory graph contains three `Person` nodes, and the two `KNOWS` relationships.
+
+
+=== Multi-graph
+
+A multi-graph is a graph with multiple node labels and relationship types.
+
+To project multiple node labels and relationship types, we can adjust the projections as follows:
+
+[role=query-example]
+--
+.Project `Person` and `Book` nodes and `KNOWS` and `READ` relationships:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'personsAndBooks',    // <1>
+  ['Person', 'Book'],   // <2>
+  ['KNOWS', 'READ']     // <3>
+)
+YIELD
+  graphName AS graph, nodeProjection, nodeCount AS nodes, relationshipCount AS rels
+----
+<1> Projects a graph under the name `personsAndBooks`.
+<2> The nodes to be projected. In this example, the nodes with a `Person` or `Book` label.
+<3> The relationships to be projected. In this example, the relationships of type `KNOWS` or `READ`.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graph             | nodeProjection                                                           | nodes  | rels
+| "personsAndBooks" | {Book={label="Book", properties={}}, Person={label="Person", properties={}}} | 5      | 6
+|===
+--
+
+In the example above, we used a short-hand syntax for the node and relationship projection.
+The used projections are internally expanded to the full `Map` syntax as shown for the `nodeProjection` in the Results table.
+In addition, we can see the projected in-memory graph contains five nodes, and the two relationships.
+
+
+=== Relationship orientation
+
+By default, relationships are loaded in the same orientation as stored in the Neo4j db.
+In GDS, we call this the `NATURAL` orientation.
+Additionally, we provide the functionality to load the relationships in the `REVERSE` or even `UNDIRECTED` orientation.
+
+[role=query-example]
+--
+.Project `Person` nodes and undirected `KNOWS` relationships:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'undirectedKnows',                    // <1>
+  'Person',                             // <2>
+  {KNOWS: {orientation: 'UNDIRECTED'}}  // <3>
+)
+YIELD
+  graphName AS graph,
+  relationshipProjection AS knowsProjection,
+  nodeCount AS nodes,
+  relationshipCount AS rels
+----
+<1> Projects a graph under the name `undirectedKnows`.
+<2> The nodes to be projected. In this example, the nodes with the Person label.
+<3> Projects relationships with type `KNOWS` and specifies that they should be `UNDIRECTED` by using the `orientation` parameter.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graph             | knowsProjection                                                                                      | nodes  | rels
+| "undirectedKnows" | {KNOWS={aggregation="DEFAULT", indexInverse=false, orientation="UNDIRECTED", properties={}, type="KNOWS"}} | 3      | 4
+|===
+--
+
+To specify the orientation, we need to write the `relationshipProjection` with the extended Map-syntax.
+Projecting the `KNOWS` relationships `UNDIRECTED`, loads each relationship in both directions.
+Thus, the `undirectedKnows` graph contains four relationships, twice as many as the `persons` graph in xref:management-ops/graph-creation/graph-project.adoc#graph-project-example-single-label-type[Simple graph].
+
+
+[[node-properties-example]]
+=== Node properties
+
+To project node properties, we can either use the `nodeProperties` configuration parameter for shared properties, or extend an individual `nodeProjection` for a specific label.
+
+[role=query-example, group=node-properties]
+--
+.Project `Person` and `Book` nodes and `KNOWS` and `READ` relationships:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'graphWithProperties',                                // <1>
+  {                                                     // <2>
+    Person: {properties: 'age'},                        // <3>
+    Book: {properties: {price: {defaultValue: 5.0}}}    // <4>
+  },
+  ['KNOWS', 'READ'],                                    // <5>
+  {nodeProperties: 'ratings'}                           // <6>
+)
+YIELD
+  graphName, nodeProjection, nodeCount AS nodes, relationshipCount AS rels
+RETURN graphName, nodeProjection.Book AS bookProjection, nodes, rels
+----
+<1> Projects a graph under the name `graphWithProperties`.
+<2> Use the expanded node projection syntax.
+<3> Projects nodes with the `Person` label and their `age` property.
+<4> Projects nodes with the `Book` label and their `price` property. Each `Book` that doesn't have the `price` property will get the `defaultValue` of `5.0`.
+<5> The relationships to be projected. In this example, the relationships of type `KNOWS` or `READ`.
+<6> The global configuration, projects node property `rating` on each of the specified labels.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graphName             | bookProjection                                                           | nodes  | rels
+| "graphWithProperties" | {label="Book", properties={price={defaultValue=5.0, property="price"}, ratings={defaultValue=null, property="ratings"}}} | 5      | 6
+|===
+--
+
+The projected `graphWithProperties` graph contains five nodes and six relationships.
+In the returned `bookProjection` we can observe, the node properties `price` and `ratings` are loaded for `Books`.
+
+NOTE: GDS currently only supports loading numeric properties.
+
+Further, the `price` property has a default value of `5.0`.
+Not every book has a price specified in the example graph.
+In the following we check if the price was correctly projected:
+
+[role=query-example, group=node-properties]
+--
+.Verify the ratings property of Adam in the projected graph:
+[source, cypher, role=noplay]
+----
+MATCH (n:Book)
+RETURN n.name AS name, gds.util.nodeProperty('graphWithProperties', n, 'price') as price
+ORDER BY price
+----
+
+.Results
+[opts="header", cols="1,1"]
+|===
+| name          | price
+| "The Hobbit"  | 5.0
+| "Frankenstein"| 19.99
+|===
+--
+
+We can see, that the price was projected with the Hobbit having the default price of 5.0.
+
+
+=== Relationship properties
+
+Analogous to node properties, we can either use the `relationshipProperties` configuration parameter or extend an individual `relationshipProjection` for a specific type.
+
+[role=query-example, group=rel-properties]
+--
+.Project `Person` and `Book` nodes and `READ` relationships with `numberOfPages` property:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'readWithProperties',                     // <1>
+  ['Person', 'Book'],                       // <2>
+  {                                         // <3>
+    READ: { properties: "numberOfPages" }   // <4>
+  }
+)
+YIELD
+  graphName AS graph,
+  relationshipProjection AS readProjection,
+  nodeCount AS nodes,
+  relationshipCount AS rels
+----
+<1> Projects a graph under the name `readWithProperties`.
+<2> The nodes to be projected. In this example, the nodes with a `Person` or `Book` label.
+<3> Use the expanded relationship projection syntax.
+<4> Project relationships of type `READ` and their `numberOfPages` property.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graph                | readProjection                                                                                                                                                                | nodes  | rels
+| "readWithProperties" | {READ={aggregation="DEFAULT", indexInverse=false, orientation="NATURAL", properties={numberOfPages={aggregation="DEFAULT", defaultValue=null, property="numberOfPages"}}, type="READ"}} | 5      | 4
+|===
+--
+
+Next, we will verify that the relationship property `numberOfPages` were correctly loaded.
+
+[role=query-example, group=rel-properties]
+--
+.Stream the relationship property `numberOfPages` of the projected graph:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationshipProperty.stream('readWithProperties', 'numberOfPages')
+YIELD sourceNodeId, targetNodeId, propertyValue AS numberOfPages
+RETURN
+  gds.util.asNode(sourceNodeId).name AS person,
+  gds.util.asNode(targetNodeId).name AS book,
+  numberOfPages
+ORDER BY person ASC, numberOfPages DESC
+----
+
+.Results
+[opts="header", cols="1,1,1"]
+|===
+| person      | book                 | numberOfPages
+| "Adam"      |  "The Hobbit"        | 30.0
+| "Florentin" |  "The Hobbit"        | 42.0
+| "Florentin" |  "The Hobbit"        | 4.0
+| "Veselin"   |  "Frankenstein"      | NaN
+|===
+--
+
+We can see, that the `numberOfPages` property is loaded. The default property value is `Double.NaN` and could be changed using the Map-Syntax the same as for node properties in xref:management-ops/graph-creation/graph-project.adoc#node-properties-example[Node properties].
+
+
+=== Parallel relationships
+
+Neo4j supports parallel relationships, i.e., multiple relationships between two nodes.
+By default, GDS preserves parallel relationships.
+For some algorithms, we want the projected graph to contain at most one relationship between two nodes.
+
+We can specify how parallel relationships should be aggregated into a single relationship via the `aggregation` parameter in a relationship projection.
+
+For graphs without relationship properties, we can use the `COUNT` aggregation.
+If we do not need the count, we could use the `SINGLE` aggregation.
+
+// special case: COUNT example
+[role=query-example, group=count-aggregate]
+--
+.Project `Person` and `Book` nodes and `COUNT` aggregated `READ` relationships:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'readCount',                      // <1>
+  ['Person', 'Book'],               // <2>
+  {
+    READ: {                         // <3>
+      properties: {
+        numberOfReads: {            // <4>
+          property: '*',            // <5>
+          aggregation: 'COUNT'      // <6>
+        }
+      }
+    }
+  }
+)
+YIELD
+  graphName AS graph,
+  relationshipProjection AS readProjection,
+  nodeCount AS nodes,
+  relationshipCount AS rels
+----
+<1> Projects a graph under the name `readCount`.
+<2> The nodes to be projected. In this example, the nodes with a `Person` or `Book` label.
+<3> Project relationships of type `READ`.
+<4> Project relationship property `numberOfReads`.
+<5> A placeholder, signaling that the value of the relationship property is derived and not based on Neo4j property.
+<6> The aggregation type. In this example, `COUNT` results in the value of the property being the number of parallel relationships.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graph      | readProjection                                                                                                                                                   | nodes  | rels
+| "readCount" | {READ={aggregation="DEFAULT", indexInverse=false, orientation="NATURAL", properties={numberOfReads={aggregation="COUNT", defaultValue=null, property="*"}}, type="READ"}} | 5      | 3
+|===
+--
+
+Next, we will verify that the `READ` relationships were correctly aggregated.
+
+[role=query-example, group=count-aggregate]
+--
+.Stream the relationship property `numberOfReads` of the projected graph:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationshipProperty.stream('readCount', 'numberOfReads')
+YIELD sourceNodeId, targetNodeId, propertyValue AS numberOfReads
+RETURN
+  gds.util.asNode(sourceNodeId).name AS person,
+  gds.util.asNode(targetNodeId).name AS book,
+  numberOfReads
+ORDER BY numberOfReads DESC, person
+----
+
+.Results
+[opts="header", cols="1,1,1"]
+|===
+| person      | book                  | numberOfReads
+| "Florentin" |  "The Hobbit"        | 2.0
+| "Adam"      |  "The Hobbit"        | 1.0
+| "Veselin"   |  "Frankenstein"      | 1.0
+|===
+--
+
+We can see, that the two READ relationships between Florentin, and the Hobbit result in `2` numberOfReads.
+
+
+=== Parallel relationships with properties
+
+For graphs with relationship properties we can also use other aggregations.
+
+[role=query-example, group=sum-aggregate]
+--
+.Project `Person` and `Book` nodes and aggregated `READ` relationships by summing the `numberOfPages`:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.project(
+  'readSums',                                                   // <1>
+  ['Person', 'Book'],                                           // <2>
+  {READ: {properties: {numberOfPages: {aggregation: 'SUM'}}}}   // <3>
+)
+YIELD
+  graphName AS graph,
+  relationshipProjection AS readProjection,
+  nodeCount AS nodes,
+  relationshipCount AS rels
+----
+<1> Projects a graph under the name `readSums`.
+<2> The nodes to be projected. In this example, the nodes with a `Person` or `Book` label.
+<3> Project relationships of type `READ`. Aggregation type `SUM` results in a projected `numberOfPages` property with its value being the sum of the `numberOfPages` properties of the parallel relationships.
+
+.Results
+[opts="header", cols="1,3m,1m,1m"]
+|===
+| graph      | readProjection                                                                                                                                                            | nodes  | rels
+| "readSums" | {READ={aggregation="DEFAULT", indexInverse=false, orientation="NATURAL", properties={numberOfPages={aggregation="SUM", defaultValue=null, property="numberOfPages"}}, type="READ"}} | 5      | 3
+|===
+--
+
+Next, we will verify that the relationship property `numberOfPages` was correctly aggregated.
+
+[role=query-example, group=sum-aggregate]
+--
+.Stream the relationship property `numberOfPages` of the projected graph:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationshipProperty.stream('readSums', 'numberOfPages')
+YIELD
+  sourceNodeId, targetNodeId, propertyValue AS numberOfPages
+RETURN
+  gds.util.asNode(sourceNodeId).name AS person,
+  gds.util.asNode(targetNodeId).name AS book,
+  numberOfPages
+ORDER BY numberOfPages DESC, person
+----
+
+.Results
+[opts="header", cols="1,1,1"]
+|===
+| person      | book                 | numberOfPages
+| "Florentin" |  "The Hobbit"        | 46.0
+| "Adam"      |  "The Hobbit"        | 30.0
+| "Veselin"   |  "Frankenstein"      | 0.0
+|===
+--
+
+We can see, that the two READ relationships between Florentin and the Hobbit sum up to `46` numberOfReads.
+
+
+=== Validate relationships flag
+
+As mentioned in the xref:management-ops/graph-creation/graph-project.adoc#graph-project-native-syntax[syntax section], the `validateRelationships` flag controls whether an error will be raised when attempting to project a relationship where either the source or target node is not present in the xref:management-ops/graph-creation/graph-project.adoc#node-projection-syntax[node projection].
+Note that even if the flag is set to `false` such a relationship will still not be projected but the loading process will not be aborted.
+
+We can simulate such a case with the xref:management-ops/graph-creation/graph-project.adoc#graph-project-examples[graph present in the Neo4j database]:
+
+--
+.Project `READ` and `KNOWS` relationships but only `Person` nodes, with `validateRelationships` set to true:
+[source, cypher]
+----
+CALL gds.graph.project(
+  'danglingRelationships',
+  'Person',
+  ['READ', 'KNOWS'],
+  {
+    validateRelationships: true
+  }
+)
+YIELD
+  graphName AS graph,
+  relationshipProjection AS readProjection,
+  nodeCount AS nodes,
+  relationshipCount AS rels
+----
+
+.Results
+----
+org.neo4j.graphdb.QueryExecutionException: Failed to invoke procedure `gds.graph.project`: Caused by: java.lang.IllegalArgumentException: Failed to load a relationship because its target-node with id 3 is not part of the node query or projection. To ignore the relationship, set the configuration parameter `validateRelationships` to false.
+----
+--
+
+We can see that the above query resulted in an exception being thrown.
+The exception message will provide information about the specific node id that was missing, which will help debugging underlying problems.
+
+
+[[all-labels-example]]
+=== Graph with all the node labels
+
+You can use the wildcard operator `*` to select all the node labels for the projection.
+However, this does not retain the label information on the projected nodes.
+
+Use the `db.labels()` instead to retrieve the list of all the labels, and use it as a value for the `nodeProjection` parameter as in the following example:
+
+[role=query-example]
+--
+.Project all the labels:
+[source, cypher, role=noplay]
+----
+CALL db.labels() YIELD label
+WITH collect(label) AS allLabels
+CALL gds.graph.project(
+  'allLabelsGraph',
+  allLabels,
+  ['KNOWS', 'READ']
+)
+YIELD graphName, nodeProjection, nodeCount AS nodes, relationshipCount AS rels
+RETURN *
+----
+
+.Results
+[opts="header", cols="1,1m,3m,1m,1m"]
+|===
+| allLabels          | graphName        | nodeProjection                                                           | nodes  | rels
+| ["Person", "Book"] | "allLabelsGraph" | {Book={label="Book", properties={}}, Person={label="Person", properties={}}} | 5      | 6
+|===
+--
+
+In a similar fashion, you can select all the relationship types for the projection by using `db.relationshipTypes()` as a value for the `relationshipProjection` parameter in place of `['KNOWS', 'READ']`.

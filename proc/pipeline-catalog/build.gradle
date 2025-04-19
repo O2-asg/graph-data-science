@@ -1,0 +1,46 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Pipeline Catalog'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    api project(':proc-common')
+
+    compileOnly project(':logging')
+
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':executor')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':pipeline')
+    implementation project(':string-formatting')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+
+    testImplementation project(':proc-test')
+    testImplementation project(':proc-common')
+    testImplementation project(':proc')
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation project(':opengds-extension')
+}

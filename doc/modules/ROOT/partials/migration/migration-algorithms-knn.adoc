@@ -1,0 +1,11 @@
+[[migration-algorithms-knn]]
+= K-Nearest Neighbors
+
+.Changes in configuration
+[options=header, cols=2]
+|===
+| 1.x
+| 2.x
+| String `nodeWeightProperty`
+| String or Map or List of Strings / Maps `nodeProperties`
+|===

@@ -1,0 +1,19 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Core Test Utils'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    api (
+        platform(openGds.junit5bom),
+        openGds.junit5.jupiter,
+        openGds.assertj.core,
+        openGds.hamcrest,
+
+        // let annotation dependencies be transitive to avoid compiler warnings for users of this project on missing annotation methods
+        openGds.jetbrains.annotations,
+        openGds.immutables.value.annotations,
+    )
+    implementation project(':string-formatting')
+}

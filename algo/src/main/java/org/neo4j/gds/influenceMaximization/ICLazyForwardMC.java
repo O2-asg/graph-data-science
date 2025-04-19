@@ -1,0 +1,116 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.neo4j.gds.influenceMaximization;
+
+import org.neo4j.gds.api.Graph;
+import org.neo4j.gds.core.concurrency.Concurrency;
+import org.neo4j.gds.core.concurrency.RunWithConcurrency;
+import org.neo4j.gds.core.utils.partition.PartitionUtils;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+
+final class ICLazyForwardMC {
+
+    private final Concurrency concurrency;
+
+    private final List<ICLazyForwardTask> tasks;
+
+    private final ExecutorService executorService;
+
+
+    private final double[] spread;
+
+    static ICLazyForwardMC create(
+        Graph graph,
+        double propagationProbability,
+        int monteCarloSimulations,
+        long firstNodeInSeedSet,
+        int seedSetCount,
+        Concurrency concurrency,
+        ExecutorService executorService,
+        long initialRandomSeed,
+        int batchSize
+    ) {
+        double[] spread = new double[batchSize];
+
+        var tasks = PartitionUtils.rangePartition(
+            concurrency,
+            monteCarloSimulations,
+            partition -> new ICLazyForwardTask(
+                partition,
+                graph.concurrentCopy(),
+                firstNodeInSeedSet,
+                seedSetCount,
+                propagationProbability,
+                initialRandomSeed,
+                batchSize
+            ),
+            Optional.of(monteCarloSimulations / concurrency.value())
+        );
+        return new ICLazyForwardMC(tasks, concurrency, executorService, spread);
+    }
+
+    private ICLazyForwardMC(
+        List<ICLazyForwardTask> tasks,
+        Concurrency concurrency,
+        ExecutorService executorService,
+        double[] spread
+    ) {
+        this.tasks = tasks;
+        this.spread = spread;
+        this.concurrency = concurrency;
+        this.executorService = executorService;
+    }
+
+    void runForCandidate(long[] candidateIdNodes, int candidateSize) {
+        for (var task : tasks) {
+            task.setCandidateNodeId(candidateIdNodes, candidateSize);
+        }
+
+        for (int j = 0; j < candidateSize; ++j) {
+            spread[j] = 0;
+        }
+
+        RunWithConcurrency.builder()
+            .concurrency(concurrency)
+            .tasks(tasks)
+            .executor(executorService)
+            .run();
+
+        for (var task : tasks) {
+            for (int j = 0; j < candidateSize; ++j) {
+                spread[j] += task.getSpread(j);
+            }
+        }
+    }
+
+    double getSpread(int j) {
+        return spread[j];
+    }
+
+    void incrementSeedNode(long newSetNode) {
+        for (var task : tasks) {
+            task.incrementSeedNode(newSetNode);
+        }
+    }
+
+}

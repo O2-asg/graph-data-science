@@ -1,0 +1,77 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Machine Learning'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    compileOnly project(':logging')
+
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':algo-common')
+    implementation project(':annotations')
+    implementation project(':applications-facade')
+    implementation project(':collections')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-utils')
+    implementation project(':core-write')
+    implementation project(':defaults-and-limits-configuration')
+    implementation project(':executor')
+    implementation project(':graph-catalog-procedure-facade')
+    implementation project(':graph-schema-api')
+    implementation project(':graph-store-catalog-applications')
+    implementation project(':memory-usage')
+    implementation project(':ml-algo')
+    implementation project(':ml-api')
+    implementation project(':ml-core')
+    implementation project(':model-catalog-api')
+    implementation project(':model-catalog-applications')
+    implementation project(':model-catalog-procedure-facade')
+    implementation project(':neo4j-api')
+    implementation project(':node-embedding-algorithms')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':operations-procedure-facade')
+    implementation project(':pipeline')
+    implementation project(':proc-common')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+    implementation project(':transaction')
+
+    implementation openGds.hdrhistogram
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation project(':logging')
+    testImplementation project(':open-model-catalog')
+    testImplementation project(':proc-test')
+    testImplementation project(':proc-common')
+    testImplementation project(':proc-community')
+    testImplementation project(':proc-centrality')
+    testImplementation project(':proc-embeddings')
+
+    testImplementation project(':opengds-extension')
+}

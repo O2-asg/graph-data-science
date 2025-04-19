@@ -1,0 +1,44 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Machine Learning Algorithms'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.immutables.builder
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    implementation project(':algo-common')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':graph-schema-api')
+    implementation project(':memory-usage')
+    implementation project(':ml-api')
+    implementation project(':ml-core')
+    implementation project(':model-catalog-api')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+
+    // TEST DEPENDENCIES
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor openGds.immutables.value
+
+    testImplementation project(':algo-common')
+    testImplementation project(':logging')
+    testImplementation project(':ml-test-utils')
+    testImplementation project(':test-utils')
+}

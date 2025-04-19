@@ -1,0 +1,147 @@
+[[utility-functions]]
+= Utility functions
+:description: This section provides explanations and examples for each of the utility functions in the Neo4j Graph Data Science library.
+
+[[utility-functions-numeric]]
+== Numeric Functions
+
+NOTE: Since Neo4j 5, this functionality can also be expressed directly in Cypher using the `Inf`, `Infinity`, and `NaN` literals and the `isNaN()` function.
+
+[[Numeric-functions-table]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name                                  | Parameter                              | Description
+| gds.util.NaN()                        | -                                      | Returns `NaN` as a Cypher value.
+| gds.util.infinity()                   | -                                      | Returns `Infinity` as a Cypher value.
+| gds.util.isFinite(value: Number)      | value to be checked if it is finite.   | Return false if the given argument is ±Infinity, NaN, or null.
+| gds.util.isInfinite(value: Number)    | value to be checked if it is infinite. | Returns `true` if the given argument is `±Infinity`, `NaN`, or `null`.
+|===
+
+
+=== Examples
+
+==== `gds.util.isFinite`
+
+[role=query-example]
+--
+.Example for gds.util.isFinite():
+[source, cypher, role=noplay]
+----
+UNWIND [1.0, gds.util.NaN(), gds.util.infinity()] AS value
+RETURN gds.util.isFinite(value) AS isFinite
+----
+
+.Results
+[opts="header"]
+|===
+| isFinite
+| true
+| false
+| false
+|===
+--
+
+==== `gds.util.isInfinite`
+
+[role=query-example]
+--
+.Example for gds.util.isInfinite():
+[source, cypher, role=noplay]
+----
+UNWIND [1.0, gds.util.NaN(), gds.util.infinity()] AS value
+RETURN gds.util.isInfinite(value) AS isInfinite
+----
+
+.Results
+[opts="header"]
+|===
+| isInfinite
+| false
+| true
+| true
+|===
+--
+
+A common usage of `gds.util.IsFinite` and `gds.util.IsInfinite` is for filtering streamed results, as for instance seen in the examples of xref:algorithms/all-pairs-shortest-path.adoc#algorithm-all-pairs-shortest-path-sample[`gds.allShortestPaths`].
+
+
+[[utility-functions-node-path]]
+== Node id functions
+
+Results in GDS often contain node IDs. You can use the following functions to connect IDs to nodes in the graph.
+
+[[Node-and-Path-functions-table]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name                                | Parameters | Description
+| gds.util.asNode(nodeId: Number)     | nodeId of a node in the neo4j-graph | Return the node object for the given node id or null if none exists.
+| gds.util.asNodes(nodeIds: List of Number) | list of nodeIds of nodes in the neo4j-graph | Return the node objects for the given node ids or an empty list if none exists.
+|===
+
+
+=== Examples
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+Consider the graph created by the following Cypher statement:
+
+.Example graph:
+[source, cypher, role=noplay setup-query]
+----
+CREATE  (nAlice:User {name: 'Alice'})
+CREATE  (nBridget:User {name: 'Bridget'})
+CREATE  (nCharles:User {name: 'Charles'})
+CREATE  (nAlice)-[:LINK]->(nBridget)
+CREATE  (nBridget)-[:LINK]->(nCharles)
+----
+
+.Project the graph into GDS:
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (n:User)-[r:LINK]->(m:User)
+RETURN gds.graph.project('socialGraph', n, m)
+----
+
+==== `AsNode`
+
+[role=query-example]
+--
+.Example for gds.util.asNode using Degree Centrality:
+[source, cypher, role=noplay]
+----
+CALL gds.degree.stream('socialGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS node, score
+ORDER BY score DESC
+----
+
+.Results
+[opts="header", cols="1,1"]
+|===
+| node | score
+| "Alice" | 1.0
+| "Bridget" | 1.0
+| "Charles" | 0.0
+|===
+--
+
+==== `AsNodes`
+
+[role=query-example]
+--
+.Example for gds.util.asNodes using Breadth-First-Search (BFS):
+[source, cypher, role=noplay]
+----
+MATCH (alice {name: 'Alice'})
+CALL gds.bfs.stream('socialGraph', {sourceNode: alice, maxDepth: 1})
+YIELD sourceNode, nodeIds
+RETURN [x in gds.util.asNodes(nodeIds)| x.name] AS nodes
+----
+
+.Results
+[opts="header"]
+|===
+| nodes
+| ["Alice", "Bridget"]
+|===
+--

@@ -1,0 +1,131 @@
+[[appendix-a-machine-learning]]
+= Machine Learning
+
+include::partial$/operations-reference/pipeline-operation-references.adoc[]
+
+include::partial$/operations-reference/model-operation-references.adoc[]
+
+
+== Pipelines
+
+[[pipelines-beta-tier]]
+=== Beta tier
+
+.List of all beta machine learning pipelines operations in the GDS library.
+[[pipelines-table-beta]]
+[role=procedure-listing]
+[opts=header,cols="1, 2"]
+|===
+|Algorithm name | Operation
+.12+<.^| xref:machine-learning/linkprediction-pipelines/link-prediction.adoc[Link Prediction Pipeline]
+| `gds.beta.pipeline.linkPrediction.create` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.addNodeProperty` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.addFeature` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.addLogisticRegression` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.addRandomForest` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.configureSplit` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.train` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.train.estimate` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.predict.mutate` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.predict.mutate.estimate` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.predict.stream` label:procedure[Procedure]
+| `gds.beta.pipeline.linkPrediction.predict.stream.estimate` label:procedure[Procedure]
+.14+<.^| xref:machine-learning/node-property-prediction/nodeclassification-pipelines/node-classification.adoc[Node Classification Pipeline]
+| `gds.beta.pipeline.nodeClassification.create` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.addNodeProperty` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.selectFeatures` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.addLogisticRegression` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.addRandomForest` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.configureSplit` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.train` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.train.estimate` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.mutate` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.mutate.estimate` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.stream` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.stream.estimate` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.write` label:procedure[Procedure]
+| `gds.beta.pipeline.nodeClassification.predict.write.estimate` label:procedure[Procedure]
+|===
+
+[[pipelines-alpha-tier]]
+=== Alpha tier
+
+.List of all alpha machine learning pipelines operations in the GDS library.
+[[pipelines-table-alpha]]
+[role=procedure-listing]
+[opts=header,cols="1, 2"]
+|===
+|Algorithm name | Operation
+.2+<.^| xref:machine-learning/linkprediction-pipelines/link-prediction.adoc[Link Prediction Pipeline]
+| `gds.alpha.pipeline.linkPrediction.addMLP` label:procedure[Procedure]
+| `gds.alpha.pipeline.linkPrediction.configureAutoTuning` label:procedure[Procedure]
+.2+<.^| xref:machine-learning/node-property-prediction/nodeclassification-pipelines/node-classification.adoc[Node Classification Pipeline]
+| `gds.alpha.pipeline.nodeClassification.addMLP` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeClassification.configureAutoTuning` label:procedure[Procedure]
+.10+<.^| xref:machine-learning/node-property-prediction/noderegression-pipelines/node-regression.adoc[Node Regression Pipeline]
+| `gds.alpha.pipeline.nodeRegression.create` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.addNodeProperty` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.selectFeatures` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.configureAutoTuning` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.configureSplit` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.addLinearRegression` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.addRandomForest` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.train` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.predict.stream` label:procedure[Procedure]
+| `gds.alpha.pipeline.nodeRegression.predict.mutate` label:procedure[Procedure]
+|===
+
+
+== Node embeddings
+
+[[embeddings-production-quality-tier]]
+=== Production-quality tier
+
+.List of all production-quality node embedding algorithms in the GDS library.
+[[embeddings-table-product]]
+[role=procedure-listing]
+[opts=header,cols="1, 2"]
+|===
+| Algorithm name | Operation
+.8+<.^| xref:machine-learning/node-embeddings/fastrp.adoc[Fast Random Projection]
+| `gds.fastRP.mutate` label:procedure[Procedure]
+| `gds.fastRP.mutate.estimate` label:procedure[Procedure]
+| `gds.fastRP.stats` label:procedure[Procedure]
+| `gds.fastRP.stats.estimate` label:procedure[Procedure]
+| `gds.fastRP.stream` label:procedure[Procedure]
+| `gds.fastRP.stream.estimate` label:procedure[Procedure]
+| `gds.fastRP.write` label:procedure[Procedure]
+| `gds.fastRP.write.estimate` label:procedure[Procedure]
+|===
+
+[[embeddings-beta-tier]]
+=== Beta tier
+
+.List of all beta node embedding algorithms in the GDS library.
+[[embeddings-table-beta]]
+[role=procedure-listing]
+[opts=header,cols="1, 2"]
+|===
+|Algorithm name | Operation
+.8+<.^|xref:machine-learning/node-embeddings/graph-sage.adoc[GraphSAGE]
+| `gds.beta.graphSage.stream` label:procedure[Procedure]
+| `gds.beta.graphSage.stream.estimate` label:procedure[Procedure]
+| `gds.beta.graphSage.mutate` label:procedure[Procedure]
+| `gds.beta.graphSage.mutate.estimate` label:procedure[Procedure]
+| `gds.beta.graphSage.write` label:procedure[Procedure]
+| `gds.beta.graphSage.write.estimate` label:procedure[Procedure]
+| `gds.beta.graphSage.train` label:procedure[Procedure]
+| `gds.beta.graphSage.train.estimate` label:procedure[Procedure]
+.4+<.^|xref:machine-learning/node-embeddings/hashgnn.adoc[HashGNN]
+| `gds.hashgnn.mutate` label:procedure[Procedure]
+| `gds.hashgnn.mutate.estimate` label:procedure[Procedure]
+| `gds.hashgnn.stream` label:procedure[Procedure]
+| `gds.hashgnn.stream.estimate` label:procedure[Procedure]
+.6+<.^|xref:machine-learning/node-embeddings/node2vec.adoc[Node2Vec]
+| `gds.node2vec.mutate` label:procedure[Procedure]
+| `gds.node2vec.mutate.estimate` label:procedure[Procedure]
+| `gds.node2vec.stream` label:procedure[Procedure]
+| `gds.node2vec.stream.estimate` label:procedure[Procedure]
+| `gds.node2vec.write` label:procedure[Procedure]
+| `gds.node2vec.write.estimate` label:procedure[Procedure]
+|===

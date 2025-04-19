@@ -1,0 +1,168 @@
+[.enterprise-edition]
+[[defaults-and-limits]]
+= Defaults and Limits
+:description: This section explains how to configure defaults and limits in the Neo4j Graph Data Science library.
+
+With the GDS library we offer convenience and safety around repetitive configuration. Specifically, we offer default configuration for those configuration items that you often want to reuse between different procedure invocations. And we offer limits as a way to restrict resource usage so that users will not overwhelm the underlying system.
+
+A good example is concurrency, a configuration parameter that applies to many GDS procedures. You might want to set a global default so that when you invoke a procedure, you automatically get that configured default value instead of the built-in one.
+
+Also, assuming have multiple users on the same system, you might want to limit concurrency for each user so that when they all work at the same time, they won't overwhelm and slow down the system excessively.
+
+Lastly, we offer defaults and limits globally or on a per-user basis. Tie breaking is done by having personal settings take precedence.
+
+== Default configuration values
+
+As a user of GDS you will often want to use the same general parameters across different procedure invocations. We allow you to set a default to avoid you repeating yourself.
+
+=== Setting a default
+
+You can set defaults by invoking the `gds.config.defaults.set` procedure. You need to supply a key-value pair and an optional username.
+
+Here we set the `concurrency` parameter to a default value of 12 for user Alicia; that means Alicia never has to specify the concurrency parameter _except_ in special cases:
+
+.Setting a default
+[source, cypher, role=noplay setup-query, operator=Alicia]
+----
+CALL gds.config.defaults.set('concurrency', 12, 'Alicia')
+----
+
+We also set `deltaThreshold` to 5%:
+
+[source, cypher, role=noplay setup-query, operator=Alicia]
+----
+CALL gds.config.defaults.set('deltaThreshold', 0.05, 'Alicia')
+----
+
+And Alicia wants to always run in `sudo` mode; she is a power user:
+
+[source, cypher, role=noplay setup-query, operator=Alicia]
+----
+CALL gds.config.defaults.set('sudo', true, 'Alicia')
+----
+
+These configuration values are now applied each time Alicia runs an algorithm that uses the `concurrency`, `maxIterations` or `sudo` configuration parameters. See for example xref:algorithms/knn.adoc[K-Nearest Neighbors].
+
+[NOTE]
+====
+If you leave out the username parameter, the default is set globally, for all users.
+====
+
+=== Listing defaults
+
+You can inspect default settings by invoking the `gds.config.defaults.list` procedure. You can supply optional username and/ or key parameters to filter results.
+
+Here is an example where we list the `concurrency` default setting for Alicia:
+
+[role=query-example, operator=Alicia]
+--
+.Querying for personal defaults and filtering by key:
+[source, cypher, role=noplay]
+----
+CALL gds.config.defaults.list({ username: 'Alicia', key: 'concurrency' })
+----
+
+Assuming Alicia didn't have a setting for `concurrency`, we would list the global setting if one existed. So what is output is always the _effective_ setting(s).
+
+.Results
+[opts="header", cols="1, 1"]
+|===
+| key           | value
+| "concurrency" | 12
+|===
+--
+
+We can also leave out the filter and see all defaults settings for Alicia:
+
+[role=query-example, operator=Alicia]
+--
+.Querying for personal defaults without a filter:
+[source, cypher, role=noplay]
+----
+CALL gds.config.defaults.list({ username: 'Alicia' })
+----
+
+.Results
+[opts="header", cols="1, 1"]
+|===
+| key              | value
+| "concurrency"    | 12
+| "deltaThreshold" | 0.05
+| "sudo"           | true
+|===
+--
+
+[NOTE]
+====
+Again, if you leave out the username parameter, we list defaults globally, for all users.
+====
+
+=== Limitations
+
+When setting defaults or listing them, we ensure that only administrators can set global defaults. We also ensure that only a user themselves or an administrator can set or list personal defaults for that user.
+
+== Limits on configuration values
+
+On a system with multiple users you will want to ensure those users are not stepping on each other's toes or worse, overwhelming the system. To achieve this we offer limits on configuration values.
+
+=== Setting a limit
+
+You can set limits by invoking the `gds.config.limits.set` procedure. You need to supply a key-value pair and an optional username.
+
+Here we set a limit on the `concurrency` parameter of 6 for user Kristian; that means Kristian will never be able to specify a value for the concurrency parameter higher than 6:
+
+.Setting a limit
+[source, cypher, role=noplay]
+----
+CALL gds.config.limits.set('concurrency', 6, 'Kristian')
+----
+
+We also disallow Kristian from running in `sudo` mode:
+
+.Setting a limit
+[source, cypher, role=noplay]
+----
+CALL gds.config.limits.set('sudo', false, 'Kristian')
+----
+
+These limits are now checked each time Kristian runs an algorithm that uses the `concurrency` or `sudo` configuration parameters. See for example xref:algorithms/page-rank.adoc[Page Rank]. He will be able to use a `concurrency` setting of 6 or lower only, and he can never run in `sudo` mode.
+
+[NOTE]
+====
+If you leave out the username parameter, the default is set globally, for all users.
+====
+
+=== Listing limits
+
+You can inspect limit settings by invoking the `gds.config.limits.list` procedure. You can supply optional username and/ or key parameters to filter results.
+
+Here is an example where we list the `concurrency` limit setting for Kristian:
+
+[role=no-play]
+--
+.Querying for personal limits and filtering by key:
+[source, cypher, role=noplay]
+----
+CALL gds.config.limits.list({ username: 'Kristian', key: 'concurrency' })
+----
+
+.Results
+[opts="header", cols="1, 1"]
+|===
+| key           | value
+| "concurrency" | 6
+| "sudo"        | false
+|===
+--
+
+We use the same conventions as described above for defaults:
+
+* We list global limit setting by default
+* You have the optional `username` parameter for listing effective setting for a given user
+* Personal limits take precedence over global ones
+* You can filter using the optional `key` parameter
+
+We do have slight differences with permissions though:
+
+* Only administrators can set limits
+* Only administrators or users themselves can list personal limits

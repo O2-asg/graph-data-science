@@ -1,0 +1,327 @@
+= Writing relationships
+:description: This chapter explains how to write relationship properties back to Neo4j.
+
+To persist relationship types in a Neo4j database, we can use `gds.graph.relationship.write`.
+Similar to streaming relationship topologies or properties, it is also possible to write back to the Neo4j database.
+This is similar to what an algorithm `write` execution mode does, but allows more fine-grained control over the operations.
+
+By default, no relationship properties will be written. To write relationship properties, these have to be explicitly specified.
+
+== Syntax
+
+.Syntax descriptions of the different operations over relationship types
+[.tabbed-example, caption=]
+====
+
+[.include-with-write]
+======
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationship.write(
+    graphName: String,
+    relationshipType: String,
+    relationshipProperty: String,
+    configuration: Map
+)
+YIELD
+  writeMillis: Integer,
+  graphName: String,
+  relationshipType: String,
+  relationshipsWritten: Integer,
+  relationshipProperty: String,
+  propertiesWritten: Integer,
+  configuration: Map
+----
+
+.Parameters
+[opts="header",cols="1,3,1,5"]
+|===
+| Name                  | Type    | Optional | Description
+| graphName             | String  | no       | The name under which the graph is stored in the catalog.
+| relationshipType      | String  | no       | The relationship type in the graph to write back.
+| relationshipProperty  | String  | yes      | The relationship property to write back.
+| configuration         | Map     | yes      | Additional parameters to configure writeRelationship.
+|===
+
+.Configuration
+[opts="header",cols="1,1,1,7"]
+|===
+| Name                   | Type                  | Default           | Description
+| concurrency            | Integer               | 4                 | The number of concurrent threads used for running the procedure. Also provides the default value for `writeConcurrency`. Note, this procedure is always running single-threaded.
+| writeConcurrency       | Integer               | 'concurrency'     | The number of concurrent threads used for writing the relationship properties. Note, this procedure is always running single-threaded.
+|===
+
+.Results
+[opts="header",cols="2,3,5"]
+|===
+| Name                  | Type                     | Description
+| writeMillis           | Integer                  | Milliseconds for writing result data back to Neo4j.
+| graphName             | String                   | The name of a graph stored in the catalog.
+| relationshipType      | String                   | The type of the relationship that was written.
+| relationshipsWritten  | Integer                  | Number relationships written.
+| relationshipProperty  | String                   | The name of the relationship property that was written.
+| propertiesWritten     | Integer                  | Number relationships properties written.
+| configuration         | Map                      | The configuration used to run the procedure.
+|===
+======
+
+[.include-with-write-multiple-properties]
+======
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationshipProperties.write(
+    graphName: String,
+    relationshipType: String,
+    relationshipProperties: List of String,
+    configuration: Map
+)
+YIELD
+  writeMillis: Integer,
+  graphName: String,
+  relationshipType: String,
+  relationshipsWritten: Integer,
+  relationshipProperties: List of String,
+  propertiesWritten: Integer,
+  configuration: Map
+----
+
+.Parameters
+[opts="header",cols="1,3,1,5"]
+|===
+| Name                      | Type    | Optional | Description
+| graphName                 | String  | no       | The name under which the graph is stored in the catalog.
+| relationshipType          | String  | no       | The relationship type in the graph to write back.
+| relationshipProperties    | String  | yes      | The relationship properties to write back.
+| configuration             | Map     | yes      | Additional parameters to configure the procedure.
+|===
+
+
+.Results
+[opts="header",cols="2,3,5"]
+|===
+| Name                      | Type                     | Description
+| writeMillis               | Integer                  | Milliseconds for writing result data back to Neo4j.
+| graphName                 | String                   | The name of a graph stored in the catalog.
+| relationshipType          | String                   | The type of the relationship that was written.
+| relationshipsWritten      | Integer                  | Number relationships written.
+| relationshipProperties    | String                   | The name of the relationship properties that were written.
+| propertiesWritten         | Integer                  | Number relationships properties written.
+| configuration             | Map                      | The configuration used to run the procedure.
+|===
+======
+====
+
+== Examples
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+We can write relationships stored in a named in-memory graph back to Neo4j.
+This can be used to write algorithm results (for example from xref:algorithms/node-similarity.adoc[Node Similarity]) or relationships that have been aggregated during graph creation.
+
+The relationships to write are specified by a relationship type.
+
+NOTE: Relationships are always written using a single thread.
+
+In order to demonstrate the GDS capabilities over node properties, we are going to create a small graph in Neo4j and project it into our graph catalog.
+
+image::example-graphs/node-similarity.svg[Visualization of the example graph,align="center"]
+
+// FIXME adjust graph to above
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  (alice:Person {name: 'Alice'}),
+  (bob:Person {name: 'Bob'}),
+  (carol:Person {name: 'Carol'}),
+  (dave:Person {name: 'Dave'}),
+  (eve:Person {name: 'Eve'}),
+  (guitar:Instrument {name: 'Guitar'}),
+  (synth:Instrument {name: 'Synthesizer'}),
+  (bongos:Instrument {name: 'Bongos'}),
+  (trumpet:Instrument {name: 'Trumpet'}),
+
+  (alice)-[:LIKES { score: 5 }]->(guitar),
+  (alice)-[:LIKES { score: 4 }]->(synth),
+  (alice)-[:LIKES { score: 3, strength: 0.5}]->(bongos),
+  (bob)-[:LIKES { score: 4 }]->(guitar),
+  (bob)-[:LIKES { score: 5 }]->(synth),
+  (carol)-[:LIKES { score: 2 }]->(bongos),
+  (dave)-[:LIKES { score: 3 }]->(guitar),
+  (dave)-[:LIKES { score: 1 }]->(synth),
+  (dave)-[:LIKES { score: 5 }]->(bongos)
+----
+
+.Project the graph:
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (person:Person)-[r:LIKES]->(instr:Instrument)
+RETURN gds.graph.project(
+  'personsAndInstruments',
+  person,
+  instr,
+  {
+    sourceNodeLabels: labels(person),
+    targetNodeLabels: labels(instr),
+    relationshipType: type(r),
+    relationshipProperties: r { .score, strength: coalesce(r.strength, 1.0) }
+  }
+)
+----
+
+.Compute the Node Similarity in our graph:
+[source, cypher, role=noplay graph-project-query]
+----
+CALL gds.nodeSimilarity.mutate('personsAndInstruments', {   // <1>
+  mutateRelationshipType: 'SIMILAR',                        // <2>
+  mutateProperty: 'score'                                   // <3>
+})
+----
+<1> Run NodeSimilarity in `mutate` mode on `personsAndInstruments` projected graph.
+<2> The algorithm will add relationships of type `SIMILAR` to the projected graph.
+<3> The algorithm will add relationship property `score` for each added relationship.
+
+[[catalog-graph-write-relationship-example]]
+=== Relationship type
+
+[role=query-example]
+--
+.Write relationships to Neo4j:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationship.write(
+  'personsAndInstruments',        // <1>
+  'SIMILAR'                       // <2>
+)
+YIELD
+  graphName, relationshipType, relationshipProperty, relationshipsWritten, propertiesWritten
+----
+<1> The name of the projected graph.
+<2> The relationship type we want to write back to the Neo4j database.
+
+.Results
+[opts="header"]
+|===
+| graphName               | relationshipType | relationshipProperty | relationshipsWritten | propertiesWritten
+| "personsAndInstruments" | "SIMILAR"        | null                 | 10                   | 0
+|===
+--
+
+By default, no relationship properties will be written, as it can be seen from the results, the `relationshipProperty` value is `null` and `propertiesWritten` are `0`.
+
+Here is an illustration of how the example graph looks in Neo4j after executing the example above.
+
+image::example-graphs/write_relationships_graph.svg[Visualization of the example graph after writing relationships back,align="center"]
+
+The `SIMILAR` relationships have been added to the underlying database and can be used in Cypher queries or for projecting to in-memory graph for running algorithms.
+The relationships in this example are undirected because we used xref:algorithms/node-similarity.adoc[Node Similarity] to mutate the in-memory graph and this algorithm creates undirected relationships, this may not be the case if we use different algorithms.
+
+
+=== Relationship type with property
+
+To write relationship properties, these have to be explicitly specified.
+
+[role=query-example]
+--
+.Write relationships and their properties to Neo4j:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationship.write(
+  'personsAndInstruments',          // <1>
+  'SIMILAR',                        // <2>
+  'score'                           // <3>
+)
+YIELD
+  graphName, relationshipType, relationshipProperty, relationshipsWritten, propertiesWritten
+----
+<1> The name of the projected graph.
+<2> The relationship type we want to write back to the Neo4j database.
+<3> The property name of the relationship we want to write back to the Neo4j database.
+
+.Results
+[opts="header"]
+|===
+| graphName               | relationshipType | relationshipProperty | relationshipsWritten | propertiesWritten
+| "personsAndInstruments" | "SIMILAR"        | "score"              | 10                   | 10
+|===
+--
+
+
+==== Relationship type with multiple properties
+
+In order to demonstrate writing relationships with multiple properties back to Neo4j we will create a small graph in the database first.
+
+image::example-graphs/write-relationship-properties.svg[Visualization of the example graph,align="center"]
+
+
+.The following Cypher statement will create the graph for this example in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  (alice:Buyer {name: 'Alice'}),
+  (instrumentSeller:Seller {name: 'Instrument Seller'}),
+  (bob:Buyer {name: 'Bob'}),
+  (carol:Buyer {name: 'Carol'}),
+  (alice)-[:PAYS { amount: 1.0}]->(instrumentSeller),
+  (alice)-[:PAYS { amount: 2.0}]->(instrumentSeller),
+  (alice)-[:PAYS { amount: 3.0}]->(instrumentSeller),
+  (alice)-[:PAYS { amount: 4.0}]->(instrumentSeller),
+  (alice)-[:PAYS { amount: 5.0}]->(instrumentSeller),
+  (alice)-[:PAYS { amount: 6.0}]->(instrumentSeller),
+
+  (bob)-[:PAYS { amount: 3.0}]->(instrumentSeller),
+  (bob)-[:PAYS { amount: 4.0}]->(instrumentSeller),
+  (carol)-[:PAYS { amount: 5.0}]->(bob),
+  (carol)-[:PAYS { amount: 6.0}]->(bob)
+----
+
+.Project the graph:
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (buyer:Buyer)-[r:PAYS]->(seller:Buyer|Seller)
+WITH buyer, seller, sum(r.amount) AS totalAmount, count(r.amount) AS numberOfPayments
+RETURN gds.graph.project(
+  'aggregatedGraph',
+  buyer,
+  seller,
+  {
+    sourceNodeLabels: labels(buyer),
+    targetNodeLabels: labels(seller),
+    relationshipType: 'PAID',
+    relationshipProperties: { totalAmount: totalAmount, numberOfPayments: numberOfPayments }
+  }
+)
+----
+
+As we can see the Neo4j graph contains some parallel relationships.
+We use GDS projection to condense these into single relationships between the nodes.
+In this example we want to track how many times someone paid someone and what is the total amount of all payments.
+
+To write relationship properties, these have to be explicitly specified.
+
+[role=query-example]
+--
+.Write relationships and their properties to Neo4j:
+[source, cypher, role=noplay]
+----
+CALL gds.graph.relationshipProperties.write(
+  'aggregatedGraph',                    // <1>
+  'PAID',                               // <2>
+  ['totalAmount', 'numberOfPayments'],  // <3>
+  {}
+)
+YIELD
+  graphName, relationshipType, relationshipProperties, relationshipsWritten, propertiesWritten
+----
+<1> The name of the projected graph.
+<2> The relationship type we want to write back to the Neo4j database.
+<3> The property names of the relationship we want to write back to the Neo4j database.
+
+.Results
+[opts="header"]
+|===
+| graphName          | relationshipType | relationshipProperties              | relationshipsWritten | propertiesWritten
+| "aggregatedGraph"  | "PAID"           | ["totalAmount", "numberOfPayments"]     | 3                    | 6
+|===
+--
+

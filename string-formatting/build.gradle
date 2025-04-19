@@ -1,0 +1,16 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: String Formatting'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+
+    implementation openGds.commons.text
+    compileOnly openGds.jetbrains.annotations
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.assertj.core
+    testImplementation openGds.hamcrest
+}

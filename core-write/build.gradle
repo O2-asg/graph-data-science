@@ -1,0 +1,38 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Core :: Write'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+    annotationProcessor group: 'org.neo4j',                name: 'annotations',        version: ver.'neo4j'
+
+    compileOnly         openGds.immutables.builder
+    compileOnly         openGds.immutables.value.annotations
+    compileOnly         openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    implementation project(':annotations')
+    implementation project(':core') // TODO move core.concurrency out of core to not depend on whole core
+    implementation project(':core-utils')
+    implementation project(':progress-tracking')
+    implementation project(':graph-schema-api')
+    implementation project(':transaction')
+    implementation project(':termination')
+
+
+    // TEST DEPENDENCIES
+    testImplementation project(':test-graph-loaders')
+    testImplementation project(':test-utils')
+
+    integrationTestImplementation project(':logging')
+}

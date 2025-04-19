@@ -1,0 +1,9 @@
+.Linear regression configuration
+[opts="header",cols="3,4,2m,2,8"]
+|===
+| Name                | Type                            | Default         | Optional | Description
+
+include::partial$/machine-learning/training-methods/gradient-descent-common-config.adoc[]
+
+include::partial$/machine-learning/training-methods/penalty-common-config.adoc[]
+|===

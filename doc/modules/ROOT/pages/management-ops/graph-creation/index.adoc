@@ -1,0 +1,125 @@
+[[graph-creation]]
+= Creating graphs
+:page-aliases: management-ops/node-properties.adoc
+
+
+You can create a GDS graph from any of the following data sources:
+
+* A Neo4j database, using a xref:management-ops/graph-creation/graph-project-cypher-projection.adoc[Cypher projection], or xref:management-ops/graph-creation/graph-project.adoc[native projection] (for ease of use, but reduced flexibility)
+* An external source, via an xref:management-ops/graph-export/graph-catalog-apache-arrow-ops.adoc[Apache Arrow connection]
+* An existing named graph, using xref:management-ops/graph-creation/graph-filter.adoc[filtering] or xref:management-ops/graph-creation/sampling/rwr.adoc[sampling]
+* xref:management-ops/graph-creation/graph-generation.adoc[Random data] (for testing purposes)
+
+Furthermore, the Python client provides several convenient methods to create graphs, for example from link:https://neo4j.com/docs/graph-data-science-client/current/graph-object/#construct[Pandas DataFrames] or some link:https://neo4j.com/docs/graph-data-science-client/current/common-datasets/[well-known datasets].
+
+
+== Graph data model
+
+// TODO maybe even just an image for illustration?
+The following describes the information that can be associated to the graphs nodes and relationships.
+
+
+=== Nodes
+
+==== Labels
+
+A node can have zero or more labels.
+Labels are represented as Strings.
+The label can be used to filter the graph on usage, for example, to only run an algorithm on a subset of the nodes by specifying the xref:common-usage/running-algos.adoc#common-configuration-node-labels[nodeLabels] parameter.
+
+If an algorithm can distinguish between different relationship types, this is indicated by the xref:introduction.adoc#introduction-algorithms-heterogeneous-nodes[Heterogeneous relationships trait] in its documentation.
+
+[[node-properties]]
+==== Node Properties
+
+The Neo4j Graph Data Science Library is capable of augmenting nodes with additional properties.
+These properties can be loaded from the database when the graph is projected.
+Many algorithms can also persist their result as one or more node properties when they are run using the `mutate` mode.
+
+[[node-properties-supported]]
+===== Supported types
+
+The Neo4j Graph Data Science library does not support all property types that are supported by the Neo4j database.
+Every supported type also defines a fallback value, which is used to indicate that the value of this property is not set.
+
+The following table lists the supported property types, as well as their corresponding fallback values.
+
+.Types
+[opts="header",cols="1,1,1,1"]
+|===
+| Java Type      | Cypher Type | Precision | Fallback value
+| Long      | Integer     | 64 bit signed | `Long.MIN_VALUE` footnote:min-value[Value of -2^63]
+| Double    | Float        | 64 bit signed | `Double.NaN`
+| List of Long | List of Integer | -   | `null`
+| List of Double | List of Float | -   | `null`
+|===
+
+
+===== Defining the type of a node property
+
+When creating a graph projection that specifies a set of node properties, the type of these properties is automatically determined using the first property value that is read by the loader for any specified property.
+All integral numerical types are interpreted as `Long` values, all floating point values are interpreted as `Double` values.
+List values are explicitly defined by the type of the values that the array contains, for example converting a `List of Integer` into a `List of Long` is not supported.
+Lists with mixed content types are not supported.
+
+===== Automatic type conversion
+
+Most algorithms that are capable of using node properties require a specific property type.
+In cases of a mismatch between the type of the provided property and the required type, the library will try to convert the property value into the required type.
+
+The automatic conversion only happens when the conversion is loss-less.
+Hence, we check the following:
+
+* `Long` to `Double`: The Long value does not exceed the supported range of the Double type.
+* `Double` to `Long`: The Double value does not have any decimal places.
+* `Double[]` to `Float[]`: The Double values do not exceed the supported range of the Float type for any of the elements in the array.
+
+The algorithm computation will fail if any of these conditions are not satisfied for any node property value.
+
+NOTE: The automatic conversion is computationally more expensive and should therefore be avoided in performance critical applications.
+
+=== Relationships
+
+Relationships in GDS can be either directed or undirected.
+Also, we supported to have multiple relationships between two nodes as well as self loops.
+Whether you should create directed or undirected relationships depends on the semantics of the relationship as well as algorithm you want to run.
+
+==== Type
+
+A relationship has a type, which is represented as a String.
+The type can be used to filter the graph on usage, for example, to only run an algorithm on a subset of the relationships by specifying the xref:common-usage/running-algos.adoc#common-configuration-relationship-types[relationshipTypes] parameter.
+If an algorithm can distinguish between different relationship types, this is indicated by the xref:introduction.adoc#introduction-algorithms-heterogeneous-rels[Heterogeneous relationships trait] in its documentation.
+
+==== Direction
+
+If an algorithm supports directed or undirected relationships can be seen by the xref:introduction.adoc#introduction-algorithms-undirected[Undirected trait] and xref:introduction.adoc#introduction-algorithms-directed[Directed trait] in its documentation.
+
+==== Properties
+
+The Neo4j Graph Data Science library does not support all property types that are supported by the Neo4j database.
+Specifically, GDS only supports numeric relationship properties, i.e., `Long`, `Double`.
+Note that `Long` will be converted to `Double` during the projection.
+
+If an algorithm supports relationship properties can be seen by the xref:introduction.adoc#introduction-algorithms-weighted[Weighted relationships trait] in its documentation.
+
+==== Relationship IDs
+
+Relationships within a projected GDS graph are only identified by their source and target nodes.
+The Neo4j relationship ID is not projected and accessible by GDS.
+In order to access the ID of an relationship, it can be added as a property to the relationship projection.
+
+.The following statement will use Cypher projection to project a graph with the relationship id as a property.
+[source, cypher, role=noplay]
+----
+MATCH (source)-[r]->(target)
+RETURN gds.graph.project(
+    'graph', source, target,
+    {
+         sourceNodeLabels: labels(source),
+         targetNodeLabels: labels(target),
+         relationshipType: type(r),
+         relationshipProperties: { relationship_id: id(r) }  //  <1>
+    }
+)
+----
+<1> The relationship id is added as a property to the projected graph.

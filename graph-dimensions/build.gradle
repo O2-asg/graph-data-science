@@ -1,0 +1,25 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Graph Dimensions'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.immutables.value
+
+    compileOnly         openGds.immutables.value.annotations
+    compileOnly         openGds.jetbrains.annotations
+
+    implementation project(':annotations')
+    implementation project(':graph-projection-api')
+    implementation openGds.hppc
+
+
+    testCompileOnly    openGds.immutables.value.annotations
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.junit5.migration
+    testImplementation openGds.assertj.core
+}

@@ -1,0 +1,81 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: ML Pipeline'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    implementation openGds.reflections
+
+    implementation project(':algo')
+    implementation project(':algo-common')
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-utils')
+    implementation project(':defaults-and-limits-configuration')
+    implementation project(':executor')
+    implementation project(':graph-schema-api')
+    implementation project(':logging')
+    implementation project(':memory-usage')
+    implementation project(':ml-algo')
+    implementation project(':ml-api')
+    implementation project(':ml-core')
+    implementation project(':model-catalog-api')
+    implementation project(':neo4j-api')
+    implementation project(':neo4j-settings')
+    implementation project(':pregel')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor openGds.immutables.value
+
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation project(':open-model-catalog')
+    testImplementation project(':test-utils')
+    testImplementation project(':algo-test')
+    testImplementation project(':proc-test')
+
+    testImplementation project(':opengds-extension')
+}

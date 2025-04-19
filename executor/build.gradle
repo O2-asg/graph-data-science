@@ -1,0 +1,60 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Executor'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    implementation project(':annotations')
+    implementation project(':algo')
+    implementation project(':algorithms-machinery')
+    implementation project(':algo-common')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':edition-api')
+    implementation project(':graph-store-catalog-applications')
+    implementation project(':logging')
+    implementation project(':memory-estimation')
+    implementation project(':memory-usage')
+    implementation project(':metrics-api')
+    implementation project(':model-catalog-api')
+    implementation project(':native-projection')
+    implementation project(':neo4j-api')
+    implementation project(':neo4j-settings')
+    implementation project(':progress-tracking')
+    implementation project(':transaction')
+    implementation project(':string-formatting')
+    implementation project(':defaults-and-limits-configuration')
+    implementation project(':licensing')
+    implementation project(':termination')
+
+    implementation openGds.reflections
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testCompileOnly openGds.immutables.builder
+
+    testImplementation project(':algo-test')
+    testImplementation project(':test-utils')
+    testImplementation project(':proc-catalog')
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+    testAnnotationProcessor openGds.immutables.value
+
+    testImplementation project(':opengds-extension')
+}

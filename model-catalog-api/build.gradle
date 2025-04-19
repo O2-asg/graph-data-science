@@ -1,0 +1,34 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Model Catalog API'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.immutables.value
+    annotationProcessor group: 'org.neo4j',      name: 'annotations',   version: ver.neo4j
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    compileOnly group: 'org.neo4j', name: 'annotations',         version: ver.neo4j, transitive: false
+    compileOnly group: 'org.neo4j', name: 'neo4j-configuration', version: ver.neo4j, transitive: false
+    compileOnly group: 'org.neo4j', name: 'neo4j-graphdb-api',   version: ver.neo4j, transitive: false
+
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':graph-projection-api')
+    implementation project(':graph-schema-api')
+    implementation project(':licensing')
+    implementation project(':ml-api')
+
+    implementation openGds.commons.lang3
+
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+    testAnnotationProcessor openGds.immutables.value
+
+    testImplementation project(':test-utils')
+}

@@ -1,0 +1,77 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Core'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+    annotationProcessor group: 'org.neo4j',                name: 'annotations',        version: ver.'neo4j'
+
+    compileOnly         openGds.immutables.builder
+    compileOnly         openGds.immutables.value.annotations
+    compileOnly         openGds.jetbrains.annotations
+    compileOnly project(':progress-tracking')
+
+    compileOnly group: 'org.neo4j', name: 'annotations', version: ver.'neo4j'
+    compileOnly group: 'org.neo4j', name: 'neo4j-kernel', version: ver.'neo4j'
+    compileOnly group: 'org.neo4j', name: 'neo4j-unsafe', version: ver.'neo4j'
+
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core-utils')
+    implementation project(':licensing')
+    implementation project(':logging')
+    implementation project(':graph-schema-api')
+    implementation project(':memory-usage')
+    implementation project(':open-licensing')
+    implementation project(':string-formatting')
+    implementation project(':collections')
+    implementation project(':collections-memory-estimation')
+    implementation project(':transaction')
+    implementation project(':termination')
+
+    implementation project(':concurrency-validation-api')
+
+    api(
+            project(':neo4j-kernel-adapter'),
+            project(':graph-projection-api'),
+            project(':graph-dimensions'),
+            project(':collections'),
+            project(':concurrency'),
+
+            openGds.agrona,
+            openGds.commons.text,
+            openGds.eclipse.collections.api,
+            openGds.eclipse.collections,
+            openGds.hppc,
+            openGds.hdrhistogram,
+    )
+
+    implementation (
+        openGds.caffeine,
+        openGds.stormpot,
+        project(':neo4j-log-adapter'),
+    )
+
+    // TEST DEPENDENCIES
+
+    testCompileOnly openGds.immutables.builder
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+    testAnnotationProcessor openGds.immutables.value
+
+    testImplementation project(':edition-api')
+    testImplementation project(':legacy-cypher-projection')
+    testImplementation project(':progress-tracking')
+    testImplementation project(':test-graph-loaders')
+    testImplementation project(':test-utils')
+
+    testImplementation openGds.jqwik
+    testImplementation openGds.qaladatagen
+    testImplementation openGds.junit.pioneer
+}

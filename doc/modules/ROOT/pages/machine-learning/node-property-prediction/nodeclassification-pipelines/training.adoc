@@ -1,0 +1,426 @@
+[[nodeclassification-pipelines-train]]
+[.beta]
+= Training the pipeline
+:description: This section describes training of Node classification pipelines in the Neo4j Graph Data Science library.
+
+include::partial$/operations-reference/beta-note.adoc[]
+
+
+The train mode, `gds.beta.pipeline.nodeClassification.train`, is responsible for splitting data, feature extraction, model selection, training and storing a model for future use.
+Running this mode results in a classification model of type `NodeClassification`, which is then stored in the xref:model-catalog/index.adoc[model catalog].
+The classification model can be xref:machine-learning/node-property-prediction/nodeclassification-pipelines/predict.adoc[applied] to a possibly different graph which classifies nodes.
+
+More precisely, the training proceeds as follows:
+
+. Apply the node property steps, added according to xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-adding-node-properties[Adding node properties], on the graph.
+The graph filter on each step consists of  `contextNodeLabels + targetNodeLabels` and `contextRelationships + relationshipTypes`.
+. Apply the `targetNodeLabels` filter to the graph.
+. Select node properties to be used as features, as specified in xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-adding-features[Adding features].
+. Split the input graph into two parts: the train graph and the test graph. This is described in xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-configure-splits[Configuring the node splits].
+These graphs are internally managed and exist only for the duration of the training.
+. Split the nodes in the train graph using stratified k-fold cross-validation.
+The number of folds `k` can be configured as described in xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-configure-splits[Configuring the node splits].
+. Each model candidate defined in the xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-adding-model-candidates[parameter space] is trained on each train set and evaluated on the respective validation set for every fold. The evaluation uses the specified primary xref:machine-learning/node-property-prediction/nodeclassification-pipelines/training.adoc#nodeclassification-pipeline-metrics[metric].
+. Choose the best performing model according to the highest average score for the primary metric.
+. Retrain the winning model on the entire train graph.
+. Evaluate the performance of the winning model on the whole train graph as well as the test graph.
+. Retrain the winning model on the entire original graph.
+. Register the winning model in the xref:model-catalog/index.adoc[Model Catalog].
+
+NOTE: The above steps describe what the procedure does logically.
+The actual steps as well as their ordering in the implementation may differ.
+
+NOTE: A step can only use node properties that are already present in the input graph or produced by steps, which were added before.
+
+NOTE: Parallel executions of the same pipeline on the same graph is not supported.
+
+
+[[nodeclassification-pipeline-metrics]]
+== Metrics
+
+The Node Classification model in the Neo4j GDS library supports the following evaluation metrics:
+
+* Global metrics
+** `F1_WEIGHTED`
+** `F1_MACRO`
+** `ACCURACY`
+** `OUT_OF_BAG_ERROR` (only for RandomForest and only gives validation and test score)
+
+* Per-class metrics
+** `F1(class=<number>)` or `F1(class=*)`
+** `PRECISION(class=<number>)` or `PRECISION(class=*)`
+** `RECALL(class=<number>)` or `RECALL(class=*)`
+** `ACCURACY(class=<number>)` or `ACCURACY(class=*)`
+
+The `*` is syntactic sugar for reporting the metric for each class in the graph.
+When using a per-class metric, the reported metrics contain keys like for example `ACCURACY_class_1`.
+
+More than one metric can be specified during training but only the first specified -- the `primary` one -- is used for evaluation, the results of all are present in the train results.
+The primary metric may not be a `*` expansion due to the ambiguity of which of the expanded metrics should be the `primary` one.
+
+include::partial$/machine-learning/out-of-bag-error-explanation.adoc[]
+
+== Syntax
+
+[.include-with-train]
+--
+.Run Node Classification in train mode on a named graph:
+[source, cypher, role=noplay]
+----
+CALL gds.beta.pipeline.nodeClassification.train(
+  graphName: String,
+  configuration: Map
+) YIELD
+  trainMillis: Integer,
+  modelInfo: Map,
+  modelSelectionStats: Map,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="1,1,1m,1,4"]
+|===
+| Name                                                          | Type              | Default              | Optional | Description
+| pipeline                                                      | String            | n/a                  | no       | The name of the pipeline to execute.
+| targetNodeLabels                                              | List of String    | ['*']                | yes      | Filter the named graph using the given node labels to obtain nodes that are subject to training and evaluation.
+| xref:common-usage/running-algos.adoc#common-configuration-relationship-types[relationshipTypes] | List of String    | ['*']                | yes      | Filter the named graph using the given relationship types.
+| xref:common-usage/running-algos.adoc#common-configuration-concurrency[concurrency]              | Integer           | 4                    | yes      | The number of concurrent threads used for running the algorithm.
+| targetProperty                                                | String            | n/a                  | no       | The class of the node. Must be of type Integer.
+| metrics                                                       | List of String    | n/a                  | no       | xref:machine-learning/node-property-prediction/nodeclassification-pipelines/training.adoc#nodeclassification-pipeline-metrics[Metrics] used to evaluate the models.
+| randomSeed                                                    | Integer           | n/a                  | yes      | Seed for the random number generator used during training.
+| modelName                                                     | String            | n/a                  | no       | The name of the model to train, must not exist in the Model Catalog.
+| xref:common-usage/running-algos.adoc#common-configuration-jobid[jobId]                         | String            | Generated internally | yes      | An ID that can be provided to more easily track the training's progress.
+| storeModelToDisk                                              | Boolean           | false                | yes       | Automatically store model to disk after training.
+|===
+
+.Results
+[opts="header",cols="1,1,6"]
+|===
+| Name          | Type    | Description
+| trainMillis   | Integer | Milliseconds used for training.
+| modelInfo               | Map     | Information about the training and the winning model.
+| modelSelectionStats     | Map     | Statistics about evaluated metrics for all model candidates.
+| configuration | Map     | Configuration used for the train procedure.
+|===
+
+The `modelInfo` can also be retrieved at a later time by using the xref:model-catalog/list.adoc[Model List Procedure].
+The `modelInfo` return field has the following algorithm-specific subfields:
+
+.Fields of modelSelectionStats
+[opts="header",cols="1,1,6"]
+|===
+| Name                    | Type          | Description
+| bestParameters          | Map           | The model parameters which performed best on average on validation folds according to the primary metric.
+| modelCandidates         | List          | List of maps, where each map contains information about one model candidate. This information includes the candidates parameters, training statistics and validation statistics.
+| bestTrial               | Integer       | The trial that produced the best model. The first trial has number 1.
+|===
+
+.Fields of modelInfo
+[opts="header",cols="1,1,6"]
+|===
+| Name              | Type            | Description
+| modelName         | String          | The name of the trained model.
+| modelType         | String          | The type of the trained model.
+| classes           | List of Integer | Sorted list of class ids which are the distinct values of `targetProperty` over the entire graph.
+| bestParameters    | Map             | The model parameters which performed best on average on validation folds according to the primary metric.
+| metrics           | Map             | Map from metric description to evaluated metrics for the winning model over the subsets of the data, see below.
+| nodePropertySteps | List of Map     | Algorithms that produce node properties within the pipeline.
+| featureProperties | List of String  | Node properties selected as input features to the pipeline model.
+|===
+
+The structure of `modelInfo` is:
+
+[listing]
+----
+{
+    bestParameters: Map,                // <1>
+    nodePropertySteps: List of Map,
+    featureProperties: List of String,
+    classes: List of Integer,           // <2>
+    metrics: {                          // <3>
+        <METRIC_NAME>: {                // <4>
+            test: Float,                // <5>
+            outerTrain: Float,          // <6>
+            train: {                    // <7>
+                avg: Float,
+                max: Float,
+                min: Float,
+            },
+            validation: {               // <8>
+                avg: Float,
+                max: Float,
+                min: Float,
+                params: Map
+            }
+        }
+    }
+}
+----
+<1> The best scoring model candidate configuration.
+<2> Sorted list of class ids which are the distinct values of `targetProperty` over the entire graph.
+<3> The `metrics` map contains an entry for each metric description, and the corresponding results for that metric.
+<4> A metric name specified in the configuration of the procedure, e.g., `F1_MACRO` or `RECALL(class=4)`.
+<5> Numeric value for the evaluation of the winning model on the test set.
+<6> Numeric value for the evaluation of the winning model on the outer train set.
+<7> The `train` entry summarizes the metric results over the `train` set.
+<8> The `validation` entry summarizes the metric results over the `validation` set.
+--
+
+[NOTE]
+====
+In (5)-(7), if the metric is `OUT_OF_BAG_ERROR`, these statistics are not reported.
+The `OUT_OF_BAG_ERROR` is only reported in (8) as validation metric and only if the model is RandomForest.
+====
+
+include::partial$/machine-learning/pipeline-training-logging-note.adoc[]
+
+
+[[nodeclassification-pipelines-examples-train]]
+== Example
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+In this section we will show examples of running a Node Classification training pipeline on a concrete graph.
+The intention is to illustrate what the results look like and to provide a guide in how to make use of the model in a real setting.
+We will do this on a small graph of a handful of nodes representing houses.
+This is an example of Multi-class classification, the `class` node property distinct values determine the number of classes, in this case three (0, 1 and 2).
+The example graph looks like this:
+
+image::example-graphs/node_property_pipeline_graph.svg[align="center"]
+
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query, group=nc]
+----
+CREATE
+  (gold:House {color: 'Gold', sizePerStory: [15.5, 23.6, 33.1], class: 0}),
+  (red:House {color: 'Red', sizePerStory: [15.5, 23.6, 100.0], class: 0}),
+  (blue:House {color: 'Blue', sizePerStory: [11.3, 35.1, 22.0], class: 0}),
+  (green:House {color: 'Green', sizePerStory: [23.2, 55.1, 0.0], class: 1}),
+  (gray:House {color: 'Gray', sizePerStory: [34.3, 24.0, 0.0],  class: 1}),
+  (black:House {color: 'Black', sizePerStory: [71.66, 55.0, 0.0], class: 1}),
+  (white:House {color: 'White', sizePerStory: [11.1, 111.0, 0.0], class: 1}),
+  (teal:House {color: 'Teal', sizePerStory: [80.8, 0.0, 0.0], class: 2}),
+  (beige:House {color: 'Beige', sizePerStory: [106.2, 0.0, 0.0], class: 2}),
+  (magenta:House {color: 'Magenta', sizePerStory: [99.9, 0.0, 0.0], class: 2}),
+  (purple:House {color: 'Purple', sizePerStory: [56.5, 0.0, 0.0], class: 2}),
+  (pink:UnknownHouse {color: 'Pink', sizePerStory: [23.2, 55.1, 56.1]}),
+  (tan:UnknownHouse {color: 'Tan', sizePerStory: [22.32, 102.0, 0.0]}),
+  (yellow:UnknownHouse {color: 'Yellow', sizePerStory: [39.0, 0.0, 0.0]}),
+
+  // richer context
+  (schiele:Painter {name: 'Schiele'}),
+  (picasso:Painter {name: 'Picasso'}),
+  (kahlo:Painter {name: 'Kahlo'}),
+
+  (schiele)-[:PAINTED]->(gold),
+  (schiele)-[:PAINTED]->(red),
+  (schiele)-[:PAINTED]->(blue),
+  (picasso)-[:PAINTED]->(green),
+  (picasso)-[:PAINTED]->(gray),
+  (picasso)-[:PAINTED]->(black),
+  (picasso)-[:PAINTED]->(white),
+  (kahlo)-[:PAINTED]->(teal),
+  (kahlo)-[:PAINTED]->(beige),
+  (kahlo)-[:PAINTED]->(magenta),
+  (kahlo)-[:PAINTED]->(purple),
+  (schiele)-[:PAINTED]->(pink),
+  (schiele)-[:PAINTED]->(tan),
+  (kahlo)-[:PAINTED]->(yellow);
+----
+
+With the graph in Neo4j we can now project it into the graph catalog to prepare it for the pipeline execution.
+We do this using a Cypher projection targeting the `House` and `UnknownHouse` labels.
+We will also project the `sizeOfStory` property to use as a model feature, and the `class` property to use as a target feature.
+
+.The following statement will project a graph using a Cypher projection and store it in the graph catalog under the name 'myGraph'.
+[source, cypher, role=noplay graph-project-query, group=nc]
+----
+MATCH (house:House|UnknownHouse)
+RETURN gds.graph.project(
+  'myGraph',
+  house,
+  null,
+  {
+    sourceNodeLabels: labels(house),
+    targetNodeLabels: [],
+    sourceNodeProperties: house { .sizePerStory, .class },
+    targetNodeProperties: {}
+  }
+)
+----
+
+[[nodeclassification-pipelines-examples-train-memory-estimation]]
+=== Memory Estimation
+:mode: train
+
+include::partial$/algorithms/shared/examples-estimate-intro.adoc[]
+
+[role=query-example, group=nc]
+--
+.The following will estimate the memory requirements for running the algorithm in train mode:
+[source, cypher, role=noplay]
+----
+CALL gds.beta.pipeline.nodeClassification.train.estimate('myGraph', {
+  pipeline: 'pipe',
+  targetNodeLabels: ['House'],
+  modelName: 'nc-model',
+  targetProperty: 'class',
+  randomSeed: 2,
+  metrics: [ 'ACCURACY' ]
+})
+YIELD requiredMemory
+----
+
+.Results
+[opts="header"]
+|===
+| requiredMemory
+| +"[1264 KiB ... 1337 KiB]"+
+|===
+--
+
+NOTE: If a node property step does not have an estimation implemented, the step will be ignored in the estimation.
+
+
+=== Train
+
+In the following examples we will demonstrate running the Node Classification training pipeline on this graph.
+We will train a model to predict the class in which a house belongs, based on its `sizePerStory` property.
+
+[[nodeclassification-pipelines-examples-train-query]]
+[role=query-example, group=nc]
+--
+.The following will train a model using a pipeline:
+[source, cypher, role=noplay]
+----
+CALL gds.beta.pipeline.nodeClassification.train('myGraph', {
+  pipeline: 'pipe',
+  targetNodeLabels: ['House'],
+  modelName: 'nc-pipeline-model',
+  targetProperty: 'class',
+  randomSeed: 1337,
+  metrics: ['ACCURACY', 'OUT_OF_BAG_ERROR']
+}) YIELD modelInfo, modelSelectionStats
+RETURN
+  modelInfo.bestParameters AS winningModel,
+  modelInfo.metrics.ACCURACY.train.avg AS avgTrainScore,
+  modelInfo.metrics.ACCURACY.outerTrain AS outerTrainScore,
+  modelInfo.metrics.ACCURACY.test AS testScore,
+  [cand IN modelSelectionStats.modelCandidates | cand.metrics.ACCURACY.validation.avg] AS validationScores
+----
+
+.Results
+[opts="header", cols="8, 2, 2, 2, 8"]
+|===
+| winningModel                                                                                                                                | avgTrainScore  | outerTrainScore    | testScore   | validationScores
+| {batchSize=100, classWeights=[], focusWeight=0.0, learningRate=0.001, maxEpochs=500, methodName="LogisticRegression", minEpochs=1, patience=1, penalty=5.881039654, tolerance=0.001} | 1.0 | 1.0 | 1.0 | [0.8, 0.0, 0.5, 0.9, 0.8]
+|===
+
+Here we can observe that the model candidate with penalty `5.881` performed the best in the training phase, with an `ACCURACY` score of 1 over the train graph as well as on the test graph.
+This model is one that the auto-tuning found.
+This indicates that the model reacted very well to the train graph, and was able to generalize well to unseen data.
+Notice that this is just a toy example on a very small graph. In order to achieve a higher test score, we may need to use better features, a larger graph, or different model configuration.
+--
+
+
+[[nodeclassification-pipelines-examples-train-filtering]]
+=== Providing richer contexts to node property steps
+
+In the above example we projected a House subgraph without relationships and used it for training and testing.
+Much information in the original graph is not used.
+We might want to utilize more node and relationship types to generate node properties (and link features) and investigate whether it improves node classification.
+We can do that by passing in `contextNodeLabels` and `contextRelationshipTypes` when adding a node property step.
+
+The following statement will project a graph containing the information about houses and their painters using a Cypher projection and store it in the graph catalog under the name 'paintingGraph'.
+[source, cypher, role=noplay graph-project-query, group=nc]
+----
+MATCH (house:House)
+OPTIONAL MATCH (painter:Painter)-[r:PAINTED]->(house:House)
+RETURN gds.graph.project(
+  'paintingGraph',
+  painter,
+  house,
+  {
+    sourceNodeLabels: ['Painter'],
+    targetNodeLabels: ['House'],
+    sourceNodeProperties: {},
+    targetNodeProperties: house { .class },
+    relationshipType: 'PAINTED'
+  },
+  { undirectedRelationshipTypes: ['PAINTED'] }
+)
+----
+
+We still train a model to predict the class of each house, but use `Painter` and `PAINTED` as context in addition to `House` to generate features that leverage the full graph structure.
+After the feature generation however, it is only the `House` nodes that are considered as training and evaluation instances, so only the `House` nodes need to have the target property `class`.
+
+First, we create a new pipeline.
+
+[source, cypher, role=noplay setup-query,group=nc]
+----
+CALL gds.beta.pipeline.nodeClassification.create('pipe-with-context')
+----
+
+Second, we add a node property step (in this case, a node embedding) with `Painter` as contextNodeLabels.
+
+[source, cypher, role=noplay setup-query,group=nc]
+----
+CALL gds.beta.pipeline.nodeClassification.addNodeProperty('pipe-with-context', 'fastRP', {
+embeddingDimension: 64,
+iterationWeights: [0, 1],
+mutateProperty:'embedding',
+contextNodeLabels: ['Painter']
+})
+----
+
+We add our embedding as a feature for the model:
+
+[source, cypher, role=noplay setup-query,group=nc]
+----
+CALL gds.beta.pipeline.nodeClassification.selectFeatures('pipe-with-context', ['embedding'])
+----
+
+And we complete the pipeline setup by adding a logistic regression model candidate:
+
+[source, cypher, role=noplay setup-query,group=nc]
+----
+CALL gds.beta.pipeline.nodeClassification.addLogisticRegression('pipe-with-context')
+----
+
+We are now ready to invoke the training of the newly created pipeline.
+
+[[nodeclassification-pipelines-examples-filtered-train-query]]
+[role=query-example,group=nc]
+--
+.The following will train a model using the context-configured pipeline:
+[source, cypher, role=noplay]
+----
+CALL gds.beta.pipeline.nodeClassification.train('paintingGraph', {
+  pipeline: 'pipe-with-context',
+  targetNodeLabels: ['House'],
+  modelName: 'nc-pipeline-model-contextual',
+  targetProperty: 'class',
+  randomSeed: 1337,
+  metrics: ['ACCURACY']
+}) YIELD modelInfo, modelSelectionStats
+RETURN
+  modelInfo.bestParameters AS winningModel,
+  modelInfo.metrics.ACCURACY.train.avg AS avgTrainScore,
+  modelInfo.metrics.ACCURACY.outerTrain AS outerTrainScore,
+  modelInfo.metrics.ACCURACY.test AS testScore,
+  [cand IN modelSelectionStats.modelCandidates | cand.metrics.ACCURACY.validation.avg] AS validationScores
+----
+
+.Results
+[opts="header", cols="8, 2, 2, 2, 8"]
+|===
+| winningModel                                                                                                                                | avgTrainScore  | outerTrainScore    | testScore   | validationScores
+| {batchSize=100, classWeights=[], focusWeight=0.0, learningRate=0.001, maxEpochs=100, methodName="LogisticRegression", minEpochs=1, patience=1, penalty=0.0, tolerance=0.001} | 1.0 | 1.0 | 1.0 | [1.0]
+|===
+--
+
+As we can see, the results indicate that the painter information is sufficient to perfectly classify the houses.
+The change is due to the embeddings taking into account more contextual information.
+While this is a toy example, additional context can sometimes provide valuable information to pipeline steps, resulting in better performance.

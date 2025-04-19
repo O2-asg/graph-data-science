@@ -1,0 +1,42 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Memory Estimation'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':legacy-cypher-projection')
+    implementation project(':native-projection')
+    implementation project(':memory-usage')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testCompileOnly openGds.immutables.builder
+
+    testImplementation project(':algo-test')
+    testImplementation project(':test-utils')
+    testImplementation project(':proc-catalog')
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+    testAnnotationProcessor openGds.immutables.value
+
+    testImplementation project(':opengds-extension')
+}

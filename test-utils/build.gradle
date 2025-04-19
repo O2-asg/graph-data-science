@@ -1,0 +1,62 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Test Utils'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':config-generator')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+    annotationProcessor group: 'org.neo4j',       name: 'annotations', version: ver.'neo4j'
+
+    compileOnly openGds.immutables.builder
+    compileOnly openGds.jetbrains.annotations
+
+
+    implementation project(':algo-common')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-utils')
+    implementation project(':legacy-cypher-projection')
+    implementation project(':native-projection')
+    implementation project(':graph-schema-api')
+    implementation project(':logging')
+    implementation project(':memory-usage')
+    implementation project(':model-catalog-api')
+    implementation project(':neo4j-api')
+    implementation project(':neo4j-log-adapter')
+    implementation project(':neo4j-settings')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':open-model-catalog')
+    implementation project(':open-write-services')
+    implementation project(':proc-common')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':transaction')
+    implementation project(':termination')
+
+    implementation(
+        openGds.neo4j.cypher.dsl,
+        openGds.gdl,
+    )
+
+    api(
+        project(':core-test-utils'),
+        [openGds.jqwik, openGds.junit.pioneer],
+        [group: 'org.junit.jupiter',       name: 'junit-jupiter-engine',    version: ver.'junit'],
+    )
+
+    api(group: 'org.neo4j.community', name: 'it-test-support', version: ver.'neo4j') {
+        exclude group:'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+
+    testImplementation project(':edition-api')
+    testImplementation project(':graph-schema-api')
+
+    testCompileOnly openGds.immutables.builder
+
+}

@@ -1,0 +1,30 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Config Generator'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.google.auto.service
+    annotationProcessor openGds.recordBuilder
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.google.auto.service
+    compileOnly openGds.recordBuilder
+
+    implementation project(':annotations')
+    implementation openGds.google.auto.common
+    implementation openGds.javapoet
+    implementation openGds.immutables.value.annotations
+    implementation openGds.jetbrains.annotations
+
+    testCompileOnly openGds.google.auto.service
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation project(':core-test-utils')
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.junit5.migration
+    testImplementation openGds.google.testing.compile
+}

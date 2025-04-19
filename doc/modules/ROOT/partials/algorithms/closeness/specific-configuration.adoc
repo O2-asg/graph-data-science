@@ -1,0 +1,1 @@
+| useWassermanFaust | Boolean | false   | yes      | Use the improved Wasserman-Faust formula for closeness computation.

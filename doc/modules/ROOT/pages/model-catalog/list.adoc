@@ -1,0 +1,88 @@
+[[catalog-model-list]]
+= Listing models
+
+Information about models in the catalog can be retrieved using the `gds.model.list()` procedure.
+
+
+== Syntax
+
+[.model-list-syntax]
+--
+.List models from the catalog:
+[source, cypher, role=noplay]
+----
+CALL gds.model.list(modelName: String)
+YIELD
+    modelName: String,
+    modelType: String,
+    modelInfo: Map,
+    creationTime: DateTime,
+    trainConfig: Map,
+    graphSchema: Map,
+    loaded: Boolean,
+    stored: Boolean,
+    published: Boolean
+----
+
+.Parameters
+[opts="header",cols="1,1,1m,1,4"]
+|===
+| Name          | Type   | Default | Optional | Description
+| modelName     | String | n/a     | yes      | The name of a model. If not specified, all models in the catalog are listed.
+|===
+
+include::partial$/machine-learning/model-catalog/shared/model-info-result.adoc[]
+--
+
+== Examples
+
+In this section we will illustrate how to list models in the model catalog.
+For simplicity, we will assume that two models named `my-model1` and `my-model2` have already been trained and exist in the model catalog.
+
+=== Listing all models
+
+The simplest case is to list all models.
+This can be done by calling `gds.model.list()` without any parameters.
+
+[role=query-example]
+--
+.Listing information about all models:
+[source, cypher, role=noplay]
+----
+CALL gds.model.list()
+YIELD modelName, modelType, modelInfo, loaded, stored, published
+----
+
+.Results
+[opts="header",cols="1m,1m,1m,1m,1m,1m"]
+|===
+| modelName   | modelType            | modelInfo                       | loaded | stored | published
+| "my-model1" | "example-model-type" | {exampleModelInfo="exampleValue"} | true   | false  | false
+| "my-model2" | "example-model-type" | {number=42}                     | true   | false  | false
+|===
+--
+
+Because this model is just an example, we omit its training details.
+
+
+=== Listing a specific model
+
+We can also request to list details about a specific model only.
+This is done by supplying the model name as parameter to the procedure.
+
+[role=query-example]
+--
+.Listing information about a specific model:
+[source, cypher, role=noplay]
+----
+CALL gds.model.list('my-model1')
+YIELD modelName, modelType, modelInfo, loaded, stored, published
+----
+
+.Results
+[opts="header",cols="1m,1m,1m,1m,1m,1m"]
+|===
+| modelName   | modelType            | modelInfo                       | loaded | stored | published
+| "my-model1" | "example-model-type" | {exampleModelInfo="exampleValue"} | true   | false  | false
+|===
+--

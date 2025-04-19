@@ -1,0 +1,27 @@
+[appendix]
+[[appendix-b]]
+= Migration from Graph Data Science library Version 1.x
+:description: If you have previously used Graph Data Science library version 1.x, you can find the information you will need to migrate to using version 2.x in this section.
+:page-aliases: appendix-b/index.adoc
+
+
+== Who should read this guide
+
+This documentation is intended for users who are familiar with the Graph Data Science library.
+We assume that most of the mentioned operations and concepts can be understood with little explanation.
+Thus we are intentionally brief in the examples and comparisons.
+Please see the dedicated chapters in this manual for details on all the features in the Graph Data Science library.
+
+== Syntax Changes
+
+In this section we will focus on side-by-side examples of operations using the syntax of versions 1.x and 2.x, respectively.
+
+This section is divided into the following sub-sections:
+
+* xref:migration-gds-1-to-gds-2/migration-algos-common.adoc[Common Changes]
+* xref:migration-gds-1-to-gds-2/migration-graph-projection.adoc[Graph Projection]
+* xref:migration-gds-1-to-gds-2/migration-graph-listing.adoc[Graph Listing]
+* xref:migration-gds-1-to-gds-2/migration-graph-drop.adoc[Graph Drop]
+* xref:migration-gds-1-to-gds-2/migration-memory-estimation.adoc[Memory Estimation]
+* xref:migration-gds-1-to-gds-2/migration-algorithms.adoc[Algorithms]
+* xref:migration-gds-1-to-gds-2/migration-ml.adoc[Machine Learning]

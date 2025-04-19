@@ -1,0 +1,26 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Concurrency'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.immutables.value
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+    compileOnly group: 'org.neo4j',      name: 'neo4j-common',      version: ver.'neo4j'
+    compileOnly project(':annotations')
+
+    implementation project(':core-utils')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+    implementation project(':concurrency-validation-api')
+
+    api openGds.agrona
+
+    // TEST DEPENDENCIES
+    testImplementation project(':test-utils')
+    testImplementation openGds.jqwik
+}

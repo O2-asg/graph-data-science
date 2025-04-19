@@ -1,0 +1,35 @@
+import java.nio.file.Files
+
+def shouldForbiddenApis = !project.hasProperty('no-forbidden-apis')
+
+if (shouldForbiddenApis) {
+    allprojects { proj ->
+        plugins.withType(JavaLibraryPlugin) {
+            proj.apply plugin: 'de.thetaphi.forbiddenapis'
+            proj.forbiddenApis {
+                signaturesFiles += files("$publicDir/etc/forbidden-apis")
+
+                ignoreSignaturesOfMissingClasses = true
+                suppressAnnotations = ["org.neo4j.gds.annotation.SuppressForbidden"]
+                bundledSignatures = ['jdk-system-out']
+            }
+            proj.tasks.matching { it.name.startsWith('forbiddenApis') }.each {
+                tasks.check.dependsOn it
+            }
+            proj.forbiddenApisMain {
+                ConfigurableFileCollection collection
+                def projectSpecificForbiddenAPIsConfig = proj.projectDir.toPath().resolve("forbidden-apis-main")
+                if(Files.exists(projectSpecificForbiddenAPIsConfig)) {
+                    collection = files("$publicDir/etc/forbidden-apis-main", projectSpecificForbiddenAPIsConfig)
+                } else {
+                    collection = files("$publicDir/etc/forbidden-apis-main")
+                }
+                signaturesFiles += collection
+                bundledSignatures += 'jdk-unsafe'
+                bundledSignatures += 'jdk-system-out'
+                exclude '**/*Immutable*.class'
+                exclude '**/RelationshipsBuilderBuilder.class'
+            }
+        }
+    }
+}

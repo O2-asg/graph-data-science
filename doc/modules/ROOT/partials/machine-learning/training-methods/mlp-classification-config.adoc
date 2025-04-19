@@ -1,0 +1,10 @@
+
+include::partial$/machine-learning/training-methods/gradient-descent-common-config.adoc[]
+
+include::partial$/machine-learning/training-methods/penalty-common-config.adoc[]
+
+| hiddenLayerSizes
+| List of Integers
+| [100]            | yes      | List of integers representing number of neurons in each layer. The default value specifies an MLP with 1 hidden layer of 100 neurons.
+
+include::partial$/machine-learning/training-methods/focus-weight-common-config.adoc[]

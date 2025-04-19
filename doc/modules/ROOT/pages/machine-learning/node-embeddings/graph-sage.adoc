@@ -1,0 +1,745 @@
+[[graph-sage]]
+[.beta]
+= GraphSAGE
+:description: This section describes the GraphSAGE node embedding algorithm in the Neo4j Graph Data Science library.
+:entity: node
+:result: embedding
+:modelType: GraphSAGE
+:algorithm: GraphSAGE
+
+include::partial$/operations-reference/beta-note.adoc[]
+
+:directed:
+:undirected:
+:heterogeneous-nodes:
+:weighted:
+include::partial$/algorithms/shared/algorithm-traits.adoc[]
+
+
+GraphSAGE is an _inductive_ algorithm for computing node embeddings.
+GraphSAGE is using node feature information to generate node embeddings on unseen nodes or graphs.
+Instead of training individual embeddings for each node, the algorithm learns a function that generates embeddings by sampling and aggregating features from a node's local neighborhood.
+
+NOTE: The algorithm is defined for UNDIRECTED graphs.
+
+For more information on this algorithm see:
+
+* https://arxiv.org/pdf/1706.02216.pdf[William L. Hamilton, Rex Ying, and Jure Leskovec. "Inductive Representation Learning on Large Graphs." 2018.^]
+* https://arxiv.org/pdf/1911.10232.pdf[Amit Pande, Kai Ni and Venkataramani Kini. "SWAG: Item Recommendations using Convolutions on Weighted Graphs." 2019.^]
+
+
+[[algorithms-embeddings-graph-sage-considerations]]
+== Considerations
+
+
+=== Isolated nodes
+
+If you are embedding a graph that has an isolated node, the aggregation step in GraphSAGE can only draw information from the node itself.
+When all the properties of that node are `0.0`, and the activation function is ReLU, this leads to an all-zero vector for that node.
+However, since GraphSAGE normalizes node embeddings using the L2-norm, and a zero vector cannot be normalized, we assign all-zero embeddings to such nodes under these special circumstances.
+In scenarios where you generate all-zero embeddings for orphan nodes, that may have impacts on downstream tasks such as nearest neighbor or other similarity algorithms. It may be more appropriate to filter out these disconnected nodes prior to running GraphSAGE.
+
+
+=== Memory estimation
+
+When doing memory estimation of the training, the feature dimension is computed as if each feature property is scalar.
+
+
+=== Graph pre-sampling to reduce time and memory
+
+Since training a GraphSAGE model may take a lot of time and memory on large graphs, it can be helpful to sample a smaller subgraph prior to training, and then training on that subgraph.
+The trained model can still be applied to predict embeddings on the full graph (or other graphs) since GraphSAGE is inductive.
+To sample a structurally representative subgraph, see xref:management-ops/graph-creation/sampling/rwr.adoc[Random walk with restarts sampling].
+
+
+=== Usage in machine learning pipelines
+
+It may be useful to generate node embeddings with GraphSAGE as a node property step in a machine learning pipeline (like xref:machine-learning/linkprediction-pipelines/link-prediction.adoc[] and xref:machine-learning/node-property-prediction/index.adoc[]).
+It is not supported to train the GraphSAGE model inside the pipeline, but rather one must first train the model outside the pipeline.
+Once the model is trained, it is possible to add GraphSAGE as a node property step to a pipeline using `gds.beta.graphSage` or the shorthand `beta.graphSage` as the `procedureName` procedure parameter, and referencing the trained model in the procedure configuration map as one would with the <<algorithms-embeddings-graph-sage-syntax, predict mutate mode>>.
+
+
+== Tuning parameters
+
+In general tuning parameters is very dependent on the specific dataset.
+
+
+=== Embedding dimension
+
+The size of the node embedding as well as its hidden layer.
+A large embedding size captures more information, but increases the required memory and computation time.
+A small embedding size is faster, but can cause the input features and graph topology to be insufficiently encoded in the embedding.
+
+
+=== Aggregator
+
+An aggregator defines how to combine a node's embedding and the sampled neighbor embeddings from the previous layer.
+GDS supports the `Mean` and `Pool` aggregators.
+
+`Mean` is simpler, requires less memory and is faster to compute.
+`Pool` is more complex and can encode a richer neighbourhood.
+
+
+=== Activation function
+
+The activation function is used to convert the input of a neuron in the neural network.
+We support `Sigmoid` and leaky `ReLu` .
+
+
+=== Sample sizes
+
+Each sample size represents a hidden layer with an output of size equal to the embedding dimension.
+The layer uses the given aggregator and activation function.
+More layers result in more distant neighbors being considered for a node's embedding.
+Layer `N` uses the sampled neighbor embeddings of distance `<\= N` at Layer `N -1`.
+The more layers the higher memory and computation time.
+
+A sample size `n` means we try to sample at most `n` neighbors from a node.
+Higher sample sizes also require more memory and computation time.
+
+
+=== Batch size
+
+This parameter defines how many training examples are grouped in a single batch.
+For each training example, we will also sample a positive and a negative example.
+The gradients are computed concurrently on the batches using `concurrency` many threads.
+
+The batch size does not affect the model quality, but can be used to tune for training speed.
+A larger batch size increases the memory consumption of the computation.
+
+
+=== Epochs
+
+This parameter defines the maximum number of epochs for the training.
+Before each epoch, the new neighbors are sampled for each layer as specified in <<_sample_sizes>>.
+Independent of the model's quality, the training will terminate after these many epochs.
+Note, that the training can also stop earlier if an epoch converged if the loss converged (see <<_tolerance>>).
+
+Setting this parameter can be useful to limit the training time for a model.
+Restricting the computational budget can serve the purpose of regularization and mitigate overfitting, which becomes a risk with a large number of epochs.
+
+Because each epoch resamples neighbors, multiple epochs avoid overfitting on specific neighborhoods.
+
+
+=== Max Iterations
+
+This parameter defines the maximum number of iterations run for a single epoch.
+Each iteration uses the gradients of randomly sampled batches, which are summed and scaled before updating the weights.
+The number of sampled batches is defined via <<_batch_sampling_ratio>>.
+Also, it is verified if the loss converged (see <<_tolerance>>).
+
+A high number of iterations can lead to overfitting for a specific sample of neighbors.
+
+
+=== Batch sampling ratio
+
+This parameter defines the number of batches to sample for a single iteration.
+
+The more batches are sampled, the more accurate the gradient computation will be.
+However, more batches also increase the runtime of each single iteration.
+
+In general, it is recommended to make sure to use at least the same number of batches as the defined `concurrency`.
+
+
+=== Search depth
+
+This parameter defines the maximum depth of the random walks which sample positive examples for each node in a batch.
+
+How close similar nodes are depends on your dataset and use case.
+
+
+=== Negative-sample weight
+
+This parameter defines the weight of the negative samples compared to the positive samples in the loss computation.
+Higher values increase the impact of negative samples in the loss and decreases the impact of the positive samples.
+
+
+=== Penalty L2
+
+This parameter defines the influence of the regularization term on the loss function.
+The l2 penalty term is computed over all the weights from the layers defined based on the <<_aggregator>> and <<_sample_sizes>>.
+
+While the regularization can avoid overfitting, a high value can even lead to underfitting.
+The minimal value is zero, where the regularization term has no effect at all.
+
+
+=== Learning rate
+
+When updating the weights, we move in the direction dictated by the Adam optimizer based on the loss function's gradients.
+The learning rate parameter dictates how much to update the weights after each iteration.
+
+
+=== Tolerance
+
+This parameter defines the convergence criteria of an epoch.
+An epoch converges if the loss of the current iteration and the loss of the previous iteration differ by less than the `tolerance`.
+
+A lower tolerance results in more sensitive training with a higher probability to train longer.
+A high tolerance means a less sensitive training and hence resulting in earlier convergence.
+
+
+=== Projected feature dimension
+
+This parameter is only relevant if you want to distinguish between multiple node labels.
+
+
+[[algorithms-embeddings-graph-sage-syntax]]
+== Syntax
+
+.GraphSAGE syntax per mode
+[.tabbed-example, caption = ]
+====
+
+[.include-with-train]
+======
+.Run GraphSAGE in train mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.train(
+  graphName: String,
+  configuration: Map
+) YIELD
+  modelInfo: Map,
+  configuration: Map,
+  trainMillis: Integer
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-train-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/graph-sage/specific-train-configuration.adoc[]
+|===
+
+.Results
+[opts="header",cols="2m,1,6"]
+|===
+| Name              | Type    | Description
+| modelInfo         | Map     | Details of the trained model.
+| configuration     | Map     | The configuration used to run the procedure.
+| trainMillis       | Integer | Milliseconds to train the model.
+|===
+
+.Details on `modelInfo`
+[opts="header",cols="1m,1,6"]
+|===
+| Name    | Type   | Description
+| name    | String | The name of the trained model.
+| type    | String | The type of the trained model. Always `graphSage`.
+| metrics | Map    | Metrics related to running the training, details in the table below.
+|===
+
+.Metrics collected during training
+[opts="header",cols="2m,1,6"]
+|===
+| Name                  | Type                     | Description
+| ranEpochs             | Integer                  | The number of ran epochs during training.
+| epochLosses           | List                     | The average loss per node after each epoch.
+| iterationLossPerEpoch | List of List of Float    | The average loss per node after each iteration for each epoch.
+| didConverge           | Boolean                  | Indicates if the training has converged.
+|===
+
+======
+
+[.include-with-stream]
+======
+.Run GraphSAGE in stream mode on a named graph.
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.stream(
+  graphName: String,
+  configuration: Map
+) YIELD
+  nodeId: Integer,
+  embedding: List
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-stream-stats-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/graph-sage/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header",cols="1m,1,6"]
+|===
+| Name      | Type         | Description
+| nodeId    | Integer      | The Neo4j node ID.
+| embedding | List of Float  | The computed node embedding.
+|===
+======
+
+[.include-with-mutate]
+======
+.Run GraphSAGE in mutate mode on a graph stored in the catalog.
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.mutate(
+  graphName: String,
+  configuration: Map
+)
+YIELD
+  nodeCount: Integer,
+  nodePropertiesWritten: Integer,
+  preProcessingMillis: Integer,
+  computeMillis: Integer,
+  mutateMillis: Integer,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-mutate-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/graph-sage/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header",cols="1,1,6"]
+|===
+| Name                  | Type                 | Description
+| nodeCount             | Integer              | The number of nodes processed.
+| nodePropertiesWritten | Integer              | The number of node properties written.
+| preProcessingMillis   | Integer              | Milliseconds for preprocessing data.
+| computeMillis         | Integer              | Milliseconds for running the algorithm.
+| mutateMillis          | Integer              | Milliseconds for writing result data back to the projected graph.
+| configuration         | Map                  | The configuration used for running the algorithm.
+|===
+======
+
+[.include-with-write]
+======
+.Run GraphSAGE in write mode on a graph stored in the catalog.
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.write(
+  graphName: String,
+  configuration: Map
+)
+YIELD
+  nodeCount: Integer,
+  nodePropertiesWritten: Integer,
+  preProcessingMillis: Integer,
+  computeMillis: Integer,
+  writeMillis: Integer,
+  configuration: Map
+----
+
+include::partial$/algorithms/common-configuration/common-parameters.adoc[]
+
+.Configuration
+[opts="header",cols="3,2,3m,2,8"]
+|===
+| Name          | Type   | Default | Optional | Description
+include::partial$/algorithms/common-configuration/common-write-configuration-entries.adoc[]
+include::partial$/machine-learning/node-embeddings/graph-sage/specific-configuration.adoc[]
+|===
+
+.Results
+[opts="header",cols="1,1,6"]
+|===
+| Name                  | Type                 | Description
+| nodeCount             | Integer              | The number of nodes processed.
+| nodePropertiesWritten | Integer              | The number of node properties written.
+| preProcessingMillis   | Integer              | Milliseconds for preprocessing data.
+| computeMillis         | Integer              | Milliseconds for running the algorithm.
+| writeMillis           | Integer              | Milliseconds for writing result data back to Neo4j.
+| configuration         | Map                  | The configuration used for running the algorithm.
+|===
+======
+====
+
+
+[[algorithms-embeddings-graph-sage-examples]]
+== Examples
+
+include::partial$/algorithms/shared/examples-named-native-note.adoc[]
+
+:algorithm-name: {algorithm}
+:graph-description: friends network
+:image-file: graph-sage-graph.svg
+include::partial$/algorithms/shared/examples-intro.adoc[]
+
+.The following Cypher statement will create the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+CREATE
+  // Persons
+  (  dan:Person {name: 'Dan',   age: 20, heightAndWeight: [185, 75]}),
+  (annie:Person {name: 'Annie', age: 12, heightAndWeight: [124, 42]}),
+  ( matt:Person {name: 'Matt',  age: 67, heightAndWeight: [170, 80]}),
+  ( jeff:Person {name: 'Jeff',  age: 45, heightAndWeight: [192, 85]}),
+  ( brie:Person {name: 'Brie',  age: 27, heightAndWeight: [176, 57]}),
+  ( elsa:Person {name: 'Elsa',  age: 32, heightAndWeight: [158, 55]}),
+  ( john:Person {name: 'John',  age: 35, heightAndWeight: [172, 76]}),
+
+  (dan)-[:KNOWS {relWeight: 1.0}]->(annie),
+  (dan)-[:KNOWS {relWeight: 1.6}]->(matt),
+  (annie)-[:KNOWS {relWeight: 0.1}]->(matt),
+  (annie)-[:KNOWS {relWeight: 3.0}]->(jeff),
+  (annie)-[:KNOWS {relWeight: 1.2}]->(brie),
+  (matt)-[:KNOWS {relWeight: 10.0}]->(brie),
+  (brie)-[:KNOWS {relWeight: 1.0}]->(elsa),
+  (brie)-[:KNOWS {relWeight: 2.2}]->(jeff),
+  (john)-[:KNOWS {relWeight: 5.0}]->(jeff)
+----
+
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (source:Person)
+OPTIONAL MATCH (source:Person)-[r:KNOWS]->(target:Person)
+RETURN gds.graph.project(
+  'persons',
+  source,
+  target,
+  {
+    sourceNodeLabels: labels(source),
+    targetNodeLabels: labels(target),
+    sourceNodeProperties: source { .age, .heightAndWeight },
+    targetNodeProperties: target { .age, .heightAndWeight },
+    relationshipType: type(r),
+    relationshipProperties: r { .relWeight }
+  },
+  { undirectedRelationshipTypes: ['KNOWS'] }
+)
+----
+
+NOTE: The algorithm is defined for UNDIRECTED graphs.
+
+
+=== Train
+
+Before we are able to generate node embeddings we need to train a model and store it in the model catalog.
+Below is an example of how to do that.
+
+NOTE: The names specified in the `featureProperties` configuration parameter must exist in the projected graph.
+
+[role=query-example]
+--
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.train(
+  'persons',
+  {
+    modelName: 'exampleTrainModel',
+    featureProperties: ['age', 'heightAndWeight'],
+    aggregator: 'mean',
+    activationFunction: 'sigmoid',
+    randomSeed: 1337,
+    sampleSizes: [25, 10]
+  }
+) YIELD modelInfo as info
+RETURN
+  info.modelName as modelName,
+  info.metrics.didConverge as didConverge,
+  info.metrics.ranEpochs as ranEpochs,
+  info.metrics.epochLosses as epochLosses
+----
+
+[opts="header",cols="2,1,1,4"]
+.Results
+|===
+| modelName           | didConverge | ranEpochs | epochLosses
+| "exampleTrainModel" | true        | 1         | [26.5784954435]
+|===
+--
+
+NOTE: Due to the random initialisation of the weight variables the results may vary between different runs.
+
+Looking at the results we can draw the following conclusions, the training converged after a single epoch, the losses are almost identical.
+Tuning the algorithm parameters, such as trying out different `sampleSizes`, `searchDepth`, `embeddingDimension` or `batchSize` can improve the losses.
+For different datasets, GraphSAGE may require different train parameters for producing good models.
+
+The trained model is automatically registered in the xref:model-catalog/index.adoc[model catalog].
+
+
+=== Train with multiple node labels
+
+In this section we describe how to train on a graph with multiple labels.
+The different labels may have different sets of properties.
+To run on such a graph, GraphSAGE is run in _multi-label mode_, in which the feature properties are projected into a common feature space.
+Therefore, all nodes have feature vectors of the same dimension after the projection.
+
+The projection for a label is linear and given by a matrix of weights.
+The weights for each label are learned jointly with the other weights of the GraphSAGE model.
+
+In the multi-label mode, the following is applied prior to the usual aggregation layers:
+
+. A property representing the label is added to the feature properties for that label
+. The feature properties for each label are projected into a feature vector of a shared dimension
+
+The projected feature dimension is configured with `projectedFeatureDimension`, and specifying it enables the multi-label mode.
+
+The feature properties used for a label are those present in the `featureProperties` configuration parameter which exist in the graph for that label.
+In the multi-label mode, it is no longer required that all labels have all the specified properties.
+
+
+==== Assumptions
+
+- A requirement for multi-label mode is that each node belongs to exactly one label.
+- A GraphSAGE model trained in this mode must be applied on graphs with the same schema with regards to node labels and properties.
+
+
+==== Examples
+
+In order to demonstrate GraphSAGE with multiple labels, we add instruments and relationships of type `LIKE` between person and instrument to the example graph.
+
+image::example-graphs/graph-sage-multi-label-graph.svg[Visualization of the multi-label example graph,align="center"]
+
+.The following Cypher statement will extend the example graph in the Neo4j database:
+[source, cypher, role=noplay setup-query]
+----
+MATCH
+  (dan:Person {name: "Dan"}),
+  (annie:Person {name: "Annie"}),
+  (matt:Person {name: "Matt"}),
+  (brie:Person {name: "Brie"}),
+  (john:Person {name: "John"})
+CREATE
+  (guitar:Instrument {name: 'Guitar', cost: 1337.0}),
+  (synth:Instrument {name: 'Synthesizer', cost: 1337.0}),
+  (bongos:Instrument {name: 'Bongos', cost: 42.0}),
+  (trumpet:Instrument {name: 'Trumpet', cost: 1337.0}),
+  (dan)-[:LIKES]->(guitar),
+  (dan)-[:LIKES]->(synth),
+  (dan)-[:LIKES]->(bongos),
+  (annie)-[:LIKES]->(guitar),
+  (annie)-[:LIKES]->(synth),
+  (matt)-[:LIKES]->(bongos),
+  (brie)-[:LIKES]->(guitar),
+  (brie)-[:LIKES]->(synth),
+  (brie)-[:LIKES]->(bongos),
+  (john)-[:LIKES]->(trumpet)
+----
+
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (source:Person)-[r:LIKES]->(target:Instrument)
+RETURN gds.graph.project(
+  'persons_with_instruments',
+  source,
+  target,
+  {
+    sourceNodeLabels: labels(source),
+    sourceNodeProperties: source { .age, .heightAndWeight },
+    targetNodeLabels: labels(target),
+    targetNodeProperties: target { .cost },
+    relationshipProperties: r { .relWeight }
+  },
+  { undirectedRelationshipTypes: ['KNOWS', 'LIKES'] }
+)
+----
+
+We can now run GraphSAGE in multi-label mode on that graph by specifying the `projectedFeatureDimension` parameter.
+Multi-label GraphSAGE removes the requirement, that each node in the in-memory graph must have all `featureProperties`.
+However, the projections are independent per label and even if two labels have the same `featureProperty` they are considered as different features before projection.
+The `projectedFeatureDimension` should equal the maximum length of the feature-array.
+In our example, persons have `age` (1) and `heightAndWeight` (2), summing up to a length of 3.
+Instruments only have `cost` with length of 1. 
+Thus, the `projectedFeatureDimension` should be set to 3.
+For each node its unique labels properties is projected using a label specific projection to vector space of dimension `projectedFeatureDimension`.
+Note that the `cost` feature is only defined for the instrument nodes, while `age` and `heightAndWeight` are only defined for persons.
+
+[source, cypher, role=noplay query-example, no-result=true]
+----
+CALL gds.beta.graphSage.train(
+  'persons_with_instruments',
+  {
+    modelName: 'multiLabelModel',
+    featureProperties: ['age', 'heightAndWeight', 'cost'],
+    projectedFeatureDimension: 3
+  }
+)
+----
+
+
+=== Train with relationship weights
+
+The GraphSAGE implementation supports training using relationship weights.
+Greater relationship weight between nodes signifies that the nodes should have more similar embedding values.
+
+.The following Cypher query trains a GraphSAGE model using relationship weights
+[source, cypher, role=noplay query-example, no-result=true]
+----
+CALL gds.beta.graphSage.train(
+  'persons',
+  {
+    modelName: 'weightedTrainedModel',
+    featureProperties: ['age', 'heightAndWeight'],
+    relationshipWeightProperty: 'relWeight',
+    nodeLabels: ['Person'],
+    relationshipTypes: ['KNOWS']
+  }
+)
+----
+
+
+=== Train when there are no node properties present in the graph
+
+In the case when you have a graph that does not have node properties we recommend to use existing algorithm in `mutate` mode to create node properties.
+Good candidates are xref:algorithms/centrality.adoc[Centrality algorithms] or xref:algorithms/community.adoc[Community algorithms].
+
+The following example illustrates calling Degree Centrality in `mutate` mode and then using the mutated property as feature of GraphSAGE training.
+For the purpose of this example we are going to use the `Persons` graph, but we will not load any properties to the in-memory graph.
+
+.Create a graph projection without any node properties
+[source, cypher, role=noplay graph-project-query]
+----
+MATCH (source:Person)-[r:KNOWS]->(target:Person)
+RETURN gds.graph.project(
+  'noPropertiesGraph',
+  source,
+  target,
+  {},
+  { undirectedRelationshipTypes: ['*'] }
+)
+----
+
+.Run DegreeCentrality mutate to create a new property for each node
+[source, cypher, role=noplay query-example, no-result=true, group=noProps]
+----
+CALL gds.degree.mutate(
+  'noPropertiesGraph',
+  {
+    mutateProperty: 'degree'
+  }
+) YIELD nodePropertiesWritten
+----
+
+.Run GraphSAGE train using the property produced by DegreeCentrality as feature property
+[source, cypher, role=noplay query-example, no-result=true, group=noProps]
+----
+CALL gds.beta.graphSage.train(
+  'noPropertiesGraph',
+  {
+    modelName: 'myModel',
+    featureProperties: ['degree']
+  }
+)
+YIELD trainMillis
+RETURN trainMillis
+----
+
+`gds.degree.mutate` will create a new node property `degree` for each of the nodes in the in-memory graph, which then can be used as `featureProperty` in the `GraphSAGE.train` mode.
+
+NOTE: Using separate algorithms to produce featureProperties can also be very useful to capture graph topology properties.
+
+=== Stream
+
+To generate embeddings and stream them back to the client we can use the stream mode.
+We must first train a model, which we do using the `gds.beta.graphSage.train` procedure.
+
+[[graph-sage-trained-model-example]]
+[source, cypher, role=noplay query-example, no-result=true, group=graphSage]
+----
+CALL gds.beta.graphSage.train(
+  'persons',
+  {
+    modelName: 'graphSage',
+    featureProperties: ['age', 'heightAndWeight'],
+    embeddingDimension: 3,
+    randomSeed: 19
+  }
+)
+----
+
+Once we have trained a model (named `'graphSage'`) we can use it to generate and stream the embeddings.
+
+[role=query-example, group=graphSage]
+--
+[source, cypher, role=noplay]
+----
+CALL gds.beta.graphSage.stream(
+  'persons',
+  {
+    modelName: 'graphSage'
+  }
+)
+YIELD nodeId, embedding
+RETURN gds.util.asNode(nodeId).name AS person, embedding
+ORDER BY person, embedding
+----
+
+[opts="header",cols="1,5"]
+.Results
+|===
+| person  | embedding
+| "Annie" | [0.5285002573, 0.4682181872, 0.7081378445]
+| "Brie"  | [0.5285002574, 0.4682181872, 0.7081378445]
+| "Dan"   | [0.5285002573, 0.4682181872, 0.7081378445]
+| "Elsa"  | [0.5285002574, 0.4682181872, 0.7081378444]
+| "Jeff"  | [0.5285002573, 0.4682181872, 0.7081378445]
+| "John"  | [0.5285002573, 0.4682181872, 0.7081378445]
+| "Matt"  | [0.5285002573, 0.4682181872, 0.7081378445]
+|===
+--
+
+NOTE: Due to the random initialisation of the weight variables the results may vary slightly between the runs.
+
+
+[[graph-sage-trained-model-example-mutate]]
+=== Mutate
+
+The xref:machine-learning/node-embeddings/graph-sage.adoc#graph-sage-trained-model-example[model trained as part of the stream example] can be reused to write the results to the in-memory graph using the `mutate` mode of the procedure.
+Below is an example of how to achieve this.
+
+--
+[source, cypher, role=noplay query-example, no-result=true, group=graphSage]
+----
+CALL gds.beta.graphSage.mutate(
+  'persons',
+  {
+    mutateProperty: 'inMemoryEmbedding',
+    modelName: 'graphSage'
+  }
+) YIELD
+  nodeCount,
+  nodePropertiesWritten
+----
+
+[opts=header]
+.Results
+|===
+| nodeCount | nodePropertiesWritten
+| 7         | 7
+|===
+--
+
+
+[[graph-sage-trained-model-example-write]]
+=== Write
+
+The xref:machine-learning/node-embeddings/graph-sage.adoc#graph-sage-trained-model-example[model trained as part of the stream example] can be reused to write the results to Neo4j.
+Below is an example of how to achieve this.
+
+--
+[source, cypher, role=noplay query-example, no-result=true, group=graphSage]
+----
+CALL gds.beta.graphSage.write(
+  'persons',
+  {
+    writeProperty: 'embedding',
+    modelName: 'graphSage'
+  }
+) YIELD
+  nodeCount,
+  nodePropertiesWritten
+----
+
+[opts=header]
+.Results
+|===
+| nodeCount | nodePropertiesWritten
+| 7         | 7
+|===
+--

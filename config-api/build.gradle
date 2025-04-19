@@ -1,0 +1,13 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Config API'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    compileOnly project(':annotations')
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    api openGds.commons.lang3
+}

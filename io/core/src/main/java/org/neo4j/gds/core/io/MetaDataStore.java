@@ -1,0 +1,79 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.neo4j.gds.core.io;
+
+import org.neo4j.gds.api.GraphStore;
+import org.neo4j.gds.api.IdMap;
+import org.neo4j.gds.api.schema.NodeSchema;
+import org.neo4j.gds.api.schema.PropertySchema;
+import org.neo4j.gds.api.schema.RelationshipSchema;
+import org.neo4j.gds.core.io.file.GraphInfo;
+
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public record MetaDataStore(
+    GraphInfo graphInfo,
+    NodeSchema nodeSchema,
+    RelationshipSchema relationshipSchema,
+    Map<String, PropertySchema> graphPropertySchema
+) {
+    static MetaDataStore of(GraphStore graphStore) {
+        var relTypeCounts = graphStore.relationshipTypes()
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    Function.identity(),
+                    graphStore::relationshipCount
+                )
+            );
+
+        var idMapTypeId = graphStore.nodes().typeId();
+
+        if (idMapTypeId.equals(IdMap.NO_TYPE)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    Locale.US,
+                    "Cannot write graph store with untyped id map. Got instance of `%s`",
+                    graphStore.nodes()
+                        .getClass()
+                        .getSimpleName()
+                )
+            );
+        }
+        GraphInfo graphInfo = GraphInfo.builder()
+            .databaseInfo(graphStore.databaseInfo())
+            .idMapBuilderType(idMapTypeId)
+            .nodeCount(graphStore.nodeCount())
+            .maxOriginalId(graphStore.nodes().highestOriginalId())
+            .relationshipTypeCounts(relTypeCounts)
+            .inverseIndexedRelationshipTypes(graphStore.inverseIndexedRelationshipTypes())
+            .build();
+        var schema = graphStore.schema();
+        return new MetaDataStore(
+            graphInfo,
+            schema.nodeSchema(),
+            schema.relationshipSchema(),
+            schema.graphProperties()
+        );
+    }
+}

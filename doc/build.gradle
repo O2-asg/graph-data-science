@@ -1,0 +1,9 @@
+description = 'Neo4j Graph Data Science :: Docs'
+
+tasks.register("assembleDocs", Tar) {
+    from(projectDir) {
+        include 'modules/'
+    }
+ }
+
+assemble.dependsOn(assembleDocs)

@@ -1,0 +1,46 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Pregel Procedure Generator'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+    annotationProcessor openGds.google.auto.service
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly         openGds.google.auto.service
+
+    implementation project(':algo-common')
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':executor')
+    implementation project(':memory-usage')
+    implementation project(':pregel')
+    implementation project(':proc-common')
+    implementation project(':proc-pregel')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+
+    implementation group: 'org.neo4j',                name: 'neo4j-logging',        version: ver.'neo4j'
+    implementation group: 'org.neo4j',                name: 'neo4j-procedure-api',  version: ver.'neo4j'
+    implementation openGds.immutables.value.annotations
+    implementation openGds.google.auto.common
+    implementation openGds.javapoet
+    implementation openGds.jetbrains.annotations
+
+    testCompileOnly  openGds.google.auto.service
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation project(':core-test-utils')
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.junit5.migration
+    testImplementation openGds.google.testing.compile
+}

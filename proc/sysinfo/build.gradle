@@ -1,0 +1,62 @@
+apply plugin: 'java-library'
+apply plugin: 'nebula.info-broker'
+apply plugin: 'nebula.info-props'
+apply plugin: 'nebula.info-basic'
+apply plugin: 'nebula.info-java'
+apply plugin: 'nebula.info-scm'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Sysinfo'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+    annotationProcessor openGds.immutables.value
+
+    compileOnly project(':annotations')
+    compileOnly openGds.immutables.value.annotations
+
+    compileOnly group: 'org.neo4j', name: 'neo4j-procedure-api', version: ver.neo4j
+    compileOnly group: 'org.neo4j', name: 'neo4j-configuration', version: ver.neo4j
+    compileOnly group: 'org.neo4j', name: 'neo4j-kernel', version: ver.neo4j
+
+    implementation project(':core')
+    implementation project(':core-utils')
+    implementation project(':memory-usage')
+    implementation project(':neo4j-settings')
+    implementation project(':licensing')
+    implementation project(':proc-common')
+
+    testCompileOnly project(':annotations')
+
+    testImplementation project(':edition-api')
+    testImplementation project(':test-utils')
+    testImplementation project(':test-graph-loaders')
+
+    testImplementation openGds.mockito.junit.jupiter
+
+    testImplementation project(':opengds-extension')
+}
+
+// configure the keys that will be written to the info.properties file
+infoBroker {
+    includedManifestProperties = [
+        'Build-Date',
+        'Build-Java-Version',
+        'Created-By',
+        'Full-Change',
+        'Implementation-Version',
+        'X-Compile-Target-JDK',
+    ]
+}
+
+// write the info.properties file on classes
+task('processVersionResources', type: Copy, dependsOn: processResources) {
+    into project.sourceSets.main.output.resourcesDir
+    from(writeManifestProperties) {
+        rename { "info.properties" }
+        into "META-INF"
+    }
+}
+classes.dependsOn(processVersionResources)

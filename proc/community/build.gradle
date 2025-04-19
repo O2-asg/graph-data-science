@@ -1,0 +1,66 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedures :: Community'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor project(':procedure-collector')
+
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    api project(':proc-common')
+
+    implementation project(':algo-common')
+    implementation project(':algorithms-machinery')
+    implementation project(':algorithms-procedure-facade')
+    implementation project(':applications-facade')
+    implementation project(':annotations')
+    implementation project(':config-api')
+    implementation project(':collections')
+    implementation project(':core')
+    implementation project(':core-write')
+    implementation project(':defaults-and-limits-configuration')
+    implementation project(':executor')
+    implementation project(':graph-catalog-procedure-facade')
+    implementation project(':graph-schema-api')
+    implementation project(':graph-store-catalog-applications')
+    implementation project(':logging')
+    implementation project(':memory-estimation')
+    implementation project(':model-catalog-applications')
+    implementation project(':model-catalog-procedure-facade')
+    implementation project(':neo4j-api')
+    implementation project(':node-embedding-algorithms')
+    implementation project(':opengds-procedure-facade')
+    implementation project(':operations-procedure-facade')
+    implementation project(':progress-tracking')
+    implementation project(':string-formatting')
+    implementation project(':termination')
+    implementation project(':transaction')
+
+    compileOnly openGds.immutables.value.annotations
+    compileOnly openGds.jetbrains.annotations
+
+    neodeps().each {
+        compileOnly(group: 'org.neo4j', name: it, version: ver.'neo4j') {
+            transitive = false
+        }
+    }
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+
+    testImplementation project(':metrics-api')
+    testImplementation project(':logging')
+    testImplementation project(':memory-usage')
+    testImplementation project(':native-projection')
+    testImplementation project(':proc-test')
+    testImplementation project(':proc-common')
+    testCompileOnly openGds.immutables.value.annotations
+    testCompileOnly openGds.immutables.builder
+    testCompileOnly openGds.jetbrains.annotations
+
+    testImplementation project(':opengds-extension')
+}

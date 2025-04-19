@@ -1,0 +1,93 @@
+[[introduction]]
+= Introduction
+:description: This chapter provides a brief introduction of the main concepts in the Neo4j Graph Data Science library.
+:keywords: alpha, beta, Production-quality, api tiers
+
+The Neo4j Graph Data Science (GDS) library provides efficiently implemented, parallel versions of common graph algorithms, exposed as Cypher procedures.
+Additionally, GDS includes machine learning pipelines to train predictive supervised models to solve graph problems, such as predicting missing relationships.
+
+[[introduction-tiers]]
+== API tiers
+
+The GDS API comprises Cypher procedures and functions.
+Each of these exist in one of three tiers of maturity:
+
+Production-quality::
+Indicates that the feature has been tested with regards to stability and scalability.
+Beta::
+Indicates that the feature is a candidate for the production-quality tier.
+Alpha::
+Indicates that the feature is experimental and might be changed or removed at any time.
+
+
+The xref:operations-reference/appendix-a.adoc[Operations Reference], lists all operations in GDS according to their tier.
+
+
+[[introduction-algorithms]]
+== Algorithms
+
+Graph algorithms are used to compute metrics for graphs, nodes, or relationships.
+
+They can provide insights on relevant entities in the graph (centralities, ranking), or inherent structures like communities (community-detection, graph-partitioning, clustering).
+
+Many graph algorithms are iterative approaches that frequently traverse the graph for the computation using random walks, breadth-first or depth-first searches, or pattern matching.
+
+Due to the exponential growth of possible paths with increasing distance, many of the approaches also have high algorithmic complexity.
+
+Fortunately, optimized algorithms exist that utilize certain structures of the graph, memoize already explored parts, and parallelize operations.
+Whenever possible, we've applied these optimizations.
+
+The Neo4j Graph Data Science library contains a large number of algorithms, which are detailed in the xref:algorithms/index.adoc[Algorithms] chapter.
+
+
+[[introduction-algorithms-traits]]
+=== Algorithm traits
+
+Algorithms in GDS have specific ways to make use of various aspects of its input graph(s).
+We call these _algorithm traits_.
+
+An algorithm trait can be:
+
+* _supported_: the algorithm leverages the trait and produces a well-defined results;
+* _allowed_: the algorithm does not leverage the trait but it still produces results;
+* _unsupported_: the algorithm does not leverage the trait and, given a graph with the trait, will return an error.
+
+The following algorithm traits exist:
+
+[[introduction-algorithms-directed]]
+Directed::
+The algorithm is well-defined on a directed graph.
+
+[[introduction-algorithms-undirected]]
+Undirected::
+The algorithm is well-defined on an undirected graph.
+
+[[introduction-algorithms-heterogeneous]]
+Heterogeneous::
+The algorithm has the ability to distinguish between nodes and/or relationships of different types.
+
+[[introduction-algorithms-heterogeneous-nodes]]
+Heterogeneous nodes::
+The algorithm has the ability to distinguish between nodes of different types.
+
+[[introduction-algorithms-heterogeneous-rels]]
+Heterogeneous relationships::
+The algorithm has the ability to distinguish between relationships of different types.
+
+[[introduction-algorithms-weighted]]
+Weighted relationships::
+The algorithm supports configuration to set relationship properties to use as weights.
+These values can represent _cost_, _time_, _capacity_ or some other domain-specific properties, specified via the xref:common-usage/running-algos.adoc#common-configuration-relationship-weight-property[relationshipWeightProperty] configuration parameter.
+The algorithm will by default consider each relationship as equally important.
+
+
+[[introduction-catalog]]
+== Graph Catalog
+
+In order to run the algorithms as efficiently as possible, GDS uses a specialized graph format to represent the graph data.
+It is therefore necessary to load the graph data from the Neo4j database into an in memory graph catalog.
+The amount of data loaded can be controlled by so called graph projections, which also allow, for example, filtering on node labels and relationship types, among other options.
+
+For more information see xref:management-ops/index.adoc[Graph Management].
+
+include::partial$/introduction/enterprise-features.adoc[leveloffset=+1]

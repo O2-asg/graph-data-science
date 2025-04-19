@@ -1,0 +1,380 @@
+[.enterprise-edition]
+[[graph-catalog-apache-arrow-ops]]
+= Export using Apache Arrow
+:description: This chapter explains how to export data using Apache Arrow™ in the Graph Data Science library.
+:page-aliases: graph-catalog-apache-arrow-ops
+
+
+The graphs in the Neo4j Graph Data Science Library support properties for nodes and relationships.
+One way to export those properties is using Cypher procedures, as documented in xref:management-ops/graph-reads/graph-stream-nodes.adoc[] and xref:management-ops/graph-reads/graph-stream-relationships.adoc[].
+Similar to the procedures, GDS also supports exporting properties via Arrow Flight.
+
+In this chapter, we assume that a Flight server has been set up and configured.
+To learn more about the installation, please refer to the xref:installation/configure-apache-arrow-server.adoc[installation chapter].
+
+Arrow export features are versioned to allow for future changes.
+Please refer to the xref:installation/configure-apache-arrow-server.adoc#arrow-server-versioning[corresponding section] in the xref:installation/configure-apache-arrow-server.adoc[] documentation for more details on versioned commands.
+
+
+== Arrow Ticket format
+
+Flight streams to read properties from an in-memory graph are initiated by the Arrow client by calling the `GET` function and providing a Flight ticket.
+The general idea is to mirror the behaviour of the procedures for streaming properties from the in-memory graph.
+To identify the graph and the procedure that we want to mirror, the ticket must contain the following keys:
+
+[[arrow-property-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name              | Type      | Description
+| graph_name        | String    | The name of the graph in the graph catalog.
+| database_name     | String    | The database the graph is associated with.
+| procedure_name    | String    | The mirrored property stream procedure.
+| configuration     | Map       | The procedure specific configuration.
+|===
+
+The following image shows the client-server interaction for exporting data using node property streaming as an example.
+
+image::arrow/export-protocol.png[Client-server protocol for Arrow export in GDS,align="center"]
+
+
+== Stream all node labels
+
+To stream node labels for each node in a graph, the client needs to provide the following ticket:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.nodeLabels.stream",
+        configuration: {
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The specific command configuration supports the following keys:
+
+[[arrow-node-labels-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name              | Type    | Description
+| consecutive_ids   | Boolean | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`).
+|===
+
+The schema of the result records is as follows:
+
+.Results
+[opts="header",cols="1m,1,1"]
+|===
+| Name           | Type            | Description  | Optional
+| nodeId         | Integer         | The id of the node. | false
+| labels         | List of Strings | The labels of the node. | false
+|===
+
+
+== Stream a single node property
+
+To stream a single node property, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.nodeProperty.stream",
+        configuration: {
+            node_labels: ["*"],
+            node_property: "foo",
+            list_node_labels: true,
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The `procedure_name` indicates that we mirror the behaviour of the existing xref:management-ops/graph-reads/graph-stream-nodes.adoc#catalog-graph-stream-single-node-property-example[procedure].
+The specific configuration needs to include the following keys:
+
+[[arrow-node-property-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name              | Type                      | Description
+| node_labels       | String or List of Strings | Stream only properties for nodes with the given labels.
+| node_property     | String                    | The node property in the graph to stream.
+| list_node_labels  | Boolean                   | Whether to include node labels of the respective nodes in the result.
+| consecutive_ids   | Boolean                   | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`) .
+|===
+
+The schema of the result records is identical to the corresponding procedure:
+
+.Results
+[opts="header",cols="2,3,5, 1"]
+|===
+| Name           | Type                                                 | Description  | Optional
+| nodeId          | Integer                                              | The id of the node. | false
+.^|propertyValue    a|
+* Integer
+* Float
+* List of Integer
+* List of Float  .^| The stored property value. | false
+| labels         | List of Strings                                      | The labels of the node. If the `list_node_labels` option was set | true
+|===
+
+
+== Stream multiple node properties
+
+To stream multiple node properties, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.nodeProperties.stream",
+        configuration: {
+            node_labels: ["*"],
+            node_properties: ["foo", "bar", "baz"],
+            list_node_labels: true,
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The `procedure_name` indicates that we mirror the behaviour of the existing xref:management-ops/graph-reads/graph-stream-nodes.adoc#catalog-graph-stream-node-properties-example[procedure].
+The specific configuration needs to include the following keys:
+
+[[arrow-node-properties-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name              | Type                      | Description
+| node_labels       | String or List of Strings | Stream only properties for nodes with the given labels.
+| node_properties   | String or List of Strings | The node properties in the graph to stream.
+| list_node_labels  | Boolean                   | Whether to include node labels of the respective nodes in the result.
+| consecutive_ids   | Boolean                   | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`).
+|===
+
+Note that the schema of the result records is not identical to the corresponding procedure.
+Instead of a separate column containing the property key, every property is returned in its own column.
+As a result, there is only one row per node which includes all its property values.
+
+For example, given the node `(a { foo: 42, bar: 1337, baz: [1,3,3,7] })` and assuming node id `0` for `a`, the resulting record schema is as follows:
+
+[opts=header,cols="1,1,1,1"]
+|===
+| nodeId    | foo   | bar   | baz
+| 0         | 42    | 1337  | [1,3,3,7]
+|===
+
+
+== Stream a single relationship property
+
+To stream a single relationship property, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationshipProperty.stream",
+        configuration: {
+            relationship_types: "REL",
+            relationship_property: "foo",
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The `procedure_name` indicates that we mirror the behaviour of the existing xref:management-ops/graph-reads/graph-stream-relationships.adoc#catalog-graph-stream-single-relationship-property-example[procedure].
+The specific configuration needs to include the following keys:
+
+[[arrow-relationship-property-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name                  | Type                      | Description
+| relationship_types    | String or List of Strings | Stream only properties for relationships with the given type.
+| relationship_property | String                    | The relationship property in the graph to stream.
+| consecutive_ids       | Boolean                   | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`).
+|===
+
+The schema of the result records is identical to the corresponding procedure:
+
+.Results
+[opts="header",cols="2,3,5"]
+|===
+|Name             | Type      | Description
+|sourceNodeId     | Integer   | The source node id of the relationship.
+|targetNodeId     | Integer   | The target node id of the relationship.
+|relationshipType | Integer   | Dictionary-encoded relationship type.
+|propertyValue    | Float     | The stored property value.
+|===
+
+Note, that the relationship type column stores the relationship type encoded as an integer.
+The corresponding string value needs to be retrieved from the corresponding dictionary value vector.
+That vector can be loaded from the dictionary provider using the encoding id of the type field.
+
+
+== Stream multiple relationship properties
+
+To stream multiple relationship properties, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationshipProperties.stream",
+        configuration: {
+            relationship_types: "REL",
+            relationship_property: ["foo", "bar"],
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The `procedure_name` indicates that we mirror the behaviour of the existing xref:management-ops/graph-reads/graph-stream-relationships.adoc#catalog-graph-stream-relationship-properties-example[procedure].
+The specific configuration needs to include the following keys:
+
+[[arrow-relationship-properties-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name                    | Type                      | Description
+| relationship_types      | String or List of Strings | Stream only properties for relationships with the given type.
+| relationship_properties | String or List of String  | The relationship properties in the graph to stream.
+| consecutive_ids         | Boolean                   | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`).
+|===
+
+Note that the schema of the result records is not identical to the corresponding procedure.
+Instead of a separate column containing the property key, every property is returned in its own column.
+As a result, there is only one row per relationship which includes all its property values.
+
+For example, given the relationship `[:REL { foo: 42.0, bar: 13.37 }]` that connects a source node with id `0` wit a target node with id `1`, the resulting record schema is as follows:
+
+.Results
+[opts="header",cols="1,1,1,1,1"]
+|===
+| sourceNodeId  | targetNodeId  | relationshipType  | foo  |  bar
+| 0             | 1             | 0                 | 42.0 | 13.37
+|===
+
+Note, that the relationship type column stores the relationship type encoded as an integer.
+The corresponding string value needs to be retrieved from the corresponding dictionary value vector.
+That vector can be loaded from the dictionary provider using the encoding id of the type field.
+
+
+== Stream relationship topology
+
+To stream the topology of one or more relationship types, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationships.stream",
+        configuration: {
+            relationship_types: "REL",
+            consecutive_ids: false
+        }
+    }
+}
+----
+
+The `procedure_name` indicates that we mirror the behaviour of the existing xref:management-ops/graph-reads/graph-stream-relationships.adoc#catalog-graph-stream-relationship-topology-example[procedure].
+The specific configuration needs to include the following keys:
+
+[[arrow-relationship-topology-export]]
+[opts=header,cols="1m,1,1"]
+|===
+| Name                    | Type                      | Description
+| relationship_types      | String or List of Strings | Stream only properties for relationships with the given type.
+| consecutive_ids         | Boolean                   | Returns node ids mapped to a consecutive id space, i.e. `[0..nodeCount)` (default: `false`).
+|===
+
+The schema of the result records is identical to the corresponding procedure:
+
+.Results
+[opts="header",cols="1,1,1"]
+|===
+| sourceNodeId  | targetNodeId  | relationshipType
+| 0             | 1             | 0
+|===
+
+Note, that the relationship type column stores the relationship type encoded as an integer.
+The corresponding string value needs to be retrieved from the corresponding dictionary value vector.
+That vector can be loaded from the dictionary provider using the encoding id of the type field.
+
+
+== Partitioning the data streams
+
+Some use-cases require the data streams to be partitioned.
+For example, if the data streams are consumed by a distributed system, the data streams need to be evenly distributed to the members of the distributed system.
+To support this use-case, the client can request the data streams to be partitioned by sending the stream request to the `FlightInfo` endpoint of the GDS Flight Server.
+The server will then return a number of endpoints, where each endpoint and it's accompanying ticket can be used to stream a partition of the data.
+The `concurrency` settings of the ticket can be used to control the number of partitions.
+
+For example, to stream the topology of one or more relationship types, the client needs to encode that information in the ticket as follows:
+
+----
+{
+    name: "GET_COMMAND",
+    version: "v1",
+    body: {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationships.stream",
+        concurrency: 2,
+        configuration: {
+            relationship_types: "REL"
+        }
+    }
+}
+----
+
+This will create at most 2 partitions of the data streams.
+The server will answer with 2 tickets:
+
+----
+[
+    {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationships.stream",
+        concurrency: 4,
+        partition_offset: 0,
+        partition_size: 100,
+        configuration: {
+            relationship_types: "REL"
+        }
+    },
+    {
+        graph_name: "my_graph",
+        database_name: "database_name",
+        procedure_name: "gds.graph.relationships.stream",
+        partition_offset: 100,
+        partition_size: 100,
+        concurrency: 4,
+        configuration: {
+            relationship_types: "REL"
+        }
+    }
+]
+----
+
+Each of the tickets can now be used to request a partition data via the `GET` endpoint of the GDS Flight Server.

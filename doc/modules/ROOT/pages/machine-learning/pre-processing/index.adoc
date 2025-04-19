@@ -1,0 +1,13 @@
+[[ml-preprocessing]]
+= Pre-processing
+
+In most machine learning scenarios, several pre-processing steps are applied to produce data that is amenable to machine learning algorithms.
+This is also true for graph data.
+The goal of pre-processing is to provide good features for the learning algorithm. As part of our pipelines we offer adding such pre-procesing steps as node property steps (see xref:machine-learning/node-property-prediction/nodeclassification-pipelines/config.adoc#nodeclassification-pipelines-adding-node-properties[Node Classification] or xref:machine-learning/linkprediction-pipelines/config.adoc#linkprediction-adding-node-properties[Link Prediction]).
+
+Some options include:
+
+* xref:machine-learning/node-embeddings/index.adoc[Node embeddings]
+* xref:algorithms/centrality.adoc[Centrality algorithms]
+* xref:machine-learning/pre-processing/scale-properties.adoc[] to normalize node features
+* xref:machine-learning/pre-processing/one-hot-encoding.adoc[] to encode string properties as numeric arrays

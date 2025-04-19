@@ -1,0 +1,33 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Graph Projection API'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly         openGds.immutables.builder
+    compileOnly         openGds.immutables.value.annotations
+    compileOnly         openGds.jetbrains.annotations
+
+    implementation(
+            project(':annotations'),
+            project(':string-formatting'),
+            openGds.eclipse.collections.api,
+            openGds.eclipse.collections,
+    )
+
+    api openGds.jackson.databind
+    api openGds.jackson.dataformat.csv
+
+    testCompileOnly         openGds.immutables.builder
+    testCompileOnly         openGds.immutables.value.annotations
+
+    testImplementation platform(openGds.junit5bom)
+    testImplementation openGds.junit5.jupiter
+    testImplementation openGds.assertj.core
+    testImplementation openGds.hamcrest
+}

@@ -1,0 +1,22 @@
+apply plugin: 'java-library'
+
+description = 'Neo4j Graph Data Science :: Procedure Collector'
+
+group = 'org.neo4j.gds'
+
+dependencies {
+    annotationProcessor project(':annotations')
+    annotationProcessor openGds.google.auto.service
+    annotationProcessor openGds.immutables.builder
+    annotationProcessor openGds.immutables.value
+
+    compileOnly      openGds.google.auto.service
+
+    implementation project(':annotations')
+    implementation project(':executor')
+    implementation group: 'org.neo4j',       name: 'neo4j-procedure-api', version: ver.neo4j
+    implementation openGds.immutables.value.annotations
+    implementation openGds.google.auto.common
+    implementation openGds.javapoet
+    implementation openGds.jetbrains.annotations
+}
